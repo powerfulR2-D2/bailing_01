@@ -11,6 +11,17 @@ from funasr.utils.postprocess_utils import rich_transcription_postprocess
 
 logger = logging.getLogger(__name__)
 
+def is_chinese(text: str) -> bool:
+    """
+    判断字符串是否为中文
+    :param text: 需要判断的字符串
+    :return: True 如果是中文，False 如果不是
+    """
+    # 使用 Unicode 编码范围判断
+    for char in text:
+        if '\u4e00' <= char <= '\u9fff':
+            return True
+    return False
 
 class ASR(ABC):
     @staticmethod
@@ -50,14 +61,17 @@ class FunASR(ASR):
             res = self.model.generate(
                 input=wav_file_path,
                 cache={},
-                language="auto",  # 语言选项: "zn", "en", "yue", "ja", "ko", "nospeech"
+                language="zn",  # 语言选项: "zn", "en", "yue", "ja", "ko", "nospeech"
                 use_itn=True,
                 batch_size_s=60,
             )
 
             text = rich_transcription_postprocess(res[0]["text"])
             logger.info(f"识别文本: {text}")
-            return text, wav_file_path
+            if is_chinese(text):
+                return text, wav_file_path
+            else:
+                return None, None
 
         except Exception as e:
             logger.error(f"ASR识别过程中发生错误: {e}")
