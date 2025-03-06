@@ -1,0 +1,154 @@
+{
+  "questions": [
+    {
+      "id": "greeting",
+      "question": "您好！我是Isabella，接下来我将与您进行一次汉密尔顿焦虑量表(HAMA)评估。这个评估主要关注您最近一周的焦虑相关症状。请您放松，如实回答每个问题即可。",
+      "type": "instruction"
+    },
+    {
+      "id": "anxious_mood",
+      "question": "最近一周里，您是否经常感到担忧、预感不好的事情会发生、害怕或者烦躁不安？",
+      "type": "open_ended",
+      "expected_topics": ["焦虑情绪", "担忧", "预感不祥"],
+      "follow_up_questions": [
+        "这种担忧的感觉有多强烈？",
+        "它对您的日常生活有影响吗？"
+      ]
+    },
+    {
+      "id": "tension",
+      "question": "您有没有感到紧张、坐立不安，或者容易被惊吓？身体会不会感到疲惫或酸痛？",
+      "type": "open_ended",
+      "expected_topics": ["肌肉紧张", "易惊", "不能放松"],
+      "follow_up_questions": [
+        "这种紧张感多久出现一次？",
+        "您是如何应对这种感觉的？"
+      ]
+    },
+    {
+      "id": "fears",
+      "question": "最近有没有特别害怕某些事情，比如黑暗、陌生人、一个人呆着或者特定的场所?",
+      "type": "open_ended",
+      "expected_topics": ["恐惧", "特定害怕", "回避"],
+      "follow_up_questions": [
+        "这种害怕会让您回避某些情况吗？",
+        "它对您的生活有多大影响？"
+      ]
+    },
+    {
+      "id": "insomnia",
+      "question": "睡眠如何？是否有入睡困难、睡眠中断或早醒，或者睡眠不安宁的问题？",
+      "type": "open_ended",
+      "expected_topics": ["失眠", "睡眠质量", "多梦"],
+      "follow_up_questions": [
+        "这种睡眠问题有多频繁？",
+        "睡眠问题如何影响您第二天的状态？"
+      ]
+    },
+    {
+      "id": "cognitive",
+      "question": "您觉得自己注意力如何？最近是否容易分心或记忆力下降？",
+      "type": "open_ended",
+      "expected_topics": ["注意力障碍", "记忆力", "思维"],
+      "follow_up_questions": [
+        "这种注意力问题会影响您的工作或日常活动吗？",
+        "您是如何应对这些困难的？"
+      ]
+    },
+    {
+      "id": "depressed_mood",
+      "question": "您最近的心情如何？有没有感到情绪低落、缺乏兴趣，或者对未来感到悲观？",
+      "type": "open_ended",
+      "expected_topics": ["抑郁情绪", "兴趣减退", "悲观"],
+      "follow_up_questions": [
+        "这种情绪低落的感觉持续多久了？",
+        "有什么能让您感觉好一些吗？"
+      ]
+    },
+    {
+      "id": "somatic_muscular",
+      "question": "您有没有感到肌肉疼痛、僵硬，或者有肌肉抽搐、磨牙等症状？",
+      "type": "open_ended",
+      "expected_topics": ["肌肉症状", "疼痛", "抽搐"],
+      "follow_up_questions": [
+        "这些症状出现在身体哪些部位？",
+        "症状的强度如何？持续多久？"
+      ]
+    },
+    {
+      "id": "somatic_sensory",
+      "question": "您有没有耳鸣、视力模糊，或者感到身体发热或发冷，虚弱无力的情况？",
+      "type": "open_ended",
+      "expected_topics": ["感觉异常", "耳鸣", "虚弱感"],
+      "follow_up_questions": [
+        "这些感觉多久会出现一次？",
+        "它们会影响您的日常活动吗？"
+      ]
+    },
+    {
+      "id": "cardiovascular",
+      "question": "您有没有感到心跳加速、胸痛或胸闷，或者血管搏动的感觉？",
+      "type": "open_ended",
+      "expected_topics": ["心悸", "胸痛", "血管搏动"],
+      "follow_up_questions": [
+        "这些症状何时出现？是否与特定情况有关？",
+        "症状持续多久？严重程度如何？"
+      ]
+    },
+    {
+      "id": "respiratory",
+      "question": "您有没有感到呼吸困难、窒息感或经常叹息、过度换气的情况？",
+      "type": "open_ended",
+      "expected_topics": ["呼吸困难", "窒息感", "叹息"],
+      "follow_up_questions": [
+        "这些呼吸问题会让您感到恐慌吗？",
+        "您如何应对这些症状？"
+      ]
+    },
+    {
+      "id": "gastrointestinal",
+      "question": "您有没有吞咽困难、恶心、呕吐、腹痛、腹泻，或者胃灼热感的情况？",
+      "type": "open_ended",
+      "expected_topics": ["消化问题", "腹痛", "腹泻"],
+      "follow_up_questions": [
+        "这些消化问题与您的情绪状态有关系吗？",
+        "它们对您的饮食习惯有影响吗？"
+      ]
+    },
+    {
+      "id": "genitourinary",
+      "question": "您最近有没有遇到尿频或排尿困难的情况？如果合适的话，也请告诉我您的性欲或月经是否有变化。",
+      "type": "open_ended",
+      "expected_topics": ["泌尿生殖", "性欲", "月经异常"],
+      "follow_up_questions": [
+        "这些问题是最近才开始的吗？",
+        "它们影响您的日常生活吗？"
+      ]
+    },
+    {
+      "id": "autonomic",
+      "question": "您有没有出现口干、脸红或苍白、多汗，或者头晕的情况？",
+      "type": "open_ended",
+      "expected_topics": ["自主神经", "出汗", "头晕"],
+      "follow_up_questions": [
+        "这些症状在什么情况下会加重？",
+        "它们会影响您的社交活动吗？"
+      ]
+    },
+    {
+      "id": "behavior",
+      "question": "在我们交谈的过程中，我注意到您的表现。最后我想问，您在不同场合会不会感到紧张不安？",
+      "type": "open_ended",
+      "expected_topics": ["行为", "紧张", "不安"],
+      "follow_up_questions": [
+        "在什么情况下您会感到特别紧张？",
+        "您如何应对这种紧张感？"
+      ]
+    },
+    {
+      "id": "conclusion",
+      "question": "非常感谢您的配合，我们的HAMA焦虑量表评估已经完成。根据我们的交谈，我会为您生成一份评估报告。您有什么问题想问我吗？",
+      "type": "conclusion"
+    }
+  ]
+}

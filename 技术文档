@@ -1,0 +1,227 @@
+
+
+用户输入 -> Web前端 
+  ↓
+SocketIO通信 
+  ↓
+Flask服务器 
+  ├─ 消息处理
+  ├─ AI推理(robot.py)
+  ├─ 文件存储
+  └─ 响应生成
+  
+  ↓
+多模态响应 
+  ├─ 文本
+  ├─ 语音(TTS)
+  └─ 图像
+
+
+main.py
+  ↓ 生成消息
+  ↓ 推送到 Web 服务器
+server.py 
+  ↓ 接收消息
+  ├─ 生成唯一 ID
+  ├─ 存储到对话历史
+  └─ 通过 WebSocket 广播
+robot.py
+  ├─ AI 推理
+  ├─ 生成响应
+  └─ 文本转语音
+
+
+# 百聆智能问诊系统技术文档
+
+## 系统架构
+
+
+1. **主程序 (`main.py`)**: 系统的入口点，负责初始化和协调整个系统
+2. **服务器 (`server/server.py`)**: 提供 Web 服务和 WebSocket 通信
+3. **机器人核心 (`bailing/robot.py`)**: 实现对话交互和多模态处理
+4. **前端界面 (`server/templates/index.html`)**: 提供用户交互界面
+
+## 主要接口和功能
+
+### 1. 主程序接口 (`main.py`)
+
+#### 主要功能
+- 加载系统配置
+- 初始化机器人实例
+- 处理对话消息推送
+
+#### 关键方法
+- `upload_video_to_web()`: 上传初始化视频
+- `push2web()`: 推送对话消息到 Web 服务器
+  - 支持文本、语音、图片和视频消息类型
+  ### `push2web()` 消息模式详解
+
+#### 消息类型和结构
+
+文本消息模式
+```json
+{
+  "type": "text",
+  "content": "用户的文本消息内容",
+  "role": "user|assistant"
+}
+语音消息模式
+{
+  "type": "audio", 
+  "content": "/path/to/audio/file.wav",
+  "role": "user|assistant",
+  "duration": 5.6,
+  "transcription": "音频转文字内容"
+}
+图片消息模式
+{
+  "type": "image",
+  "content": "/path/to/image/file.png",
+  "role": "user|assistant",
+  "description": "图片描述",
+  "tags": 
+}
+视频消息模式
+{
+  "type": "video", 
+  "content": "/path/to/video/file.mp4",
+  "role": "user|assistant",
+  "duration": 30.5,
+  "thumbnail": "/path/to/thumbnail.jpg"
+}
+
+### 2. 服务器接口 (`server/server.py`)
+
+#### WebSocket 事件
+- `connect`: 客户端连接事件
+- `disconnect`: 客户端断开连接事件
+- `patient_info`: 处理患者信息注册
+
+#### HTTP 路由
+- `GET /`: 渲染主页
+- `POST /add_message`: 添加对话消息
+- `POST /upload_audio`: 上传语音文件
+- `POST /upload_image`: 上传图片文件
+- `POST /upload_video`: 上传视频文件
+- `GET /audio/<filename>`: 获取语音文件
+- `GET /image/<filename>`: 获取图片文件
+- `GET /video/<filename>`: 获取视频文件
+
+### 3. 机器人核心类详细说明
+
+#### `Robot` 类详解
+
+`Robot` 类是系统的核心控制类，负责协调和管理整个对话交互流程。
+
+##### 类初始化 `__init__(self, config_file)`
+
+初始化方法接收配置文件路径，并完成以下关键工作：
+
+1. **模块实例化**：根据配置文件动态创建各功能模块实例
+   - 语音录制器 (`recorder`)
+   - 语音识别 (`asr`)
+   - 文本生成 (`llm`)
+   - 文本转语音 (`tts`)
+   - 语音活动检测 (`vad`)
+   - 音频播放器 (`player`)
+
+2. **并发管理**
+   - 初始化线程池 (`ThreadPoolExecutor`)
+   - 创建多个消息队列（`audio_queue`, `vad_queue`, `task_queue`）
+   - 设置线程同步锁 (`chat_lock`)
+
+3. **对话控制**
+   - 配置中断处理参数
+   - 初始化停止事件 (`stop_event`)
+   - 创建任务管理器 (`TaskManager`)
+
+4. **会话管理**
+   - 初始化 `InterviewSession`
+   - 异步初始化对话代理
+
+##### 关键方法
+
+- `listen_dialogue(callback)`: 监听并处理对话消息
+- `start()`: 启动机器人主流程
+- `stop()`: 停止机器人运行
+- `process_audio()`: 处理音频输入
+- `generate_response()`: 生成对话响应
+
+#### `InterviewSession` 类详解
+
+`InterviewSession` 类专门管理医疗问诊会话，提供个性化和智能化的问诊体验。
+
+##### 类初始化 `__init__(self, openai_client)`
+
+1. **配置管理**
+   - 设置默认问诊脚本路径
+   - 初始化日志记录器 (`InterviewLogger`)
+   - 创建问题生成器 (`QuestionGenerator`)
+
+2. **OpenAI 客户端**
+   - 接收 OpenAI 异步客户端实例
+   - 用于后续的 AI 交互和问题生成
+
+##### 关键异步方法 `initialize_agent(self, patient_info=None)`
+
+1. **个性化问题生成**
+   - 如果提供患者信息，动态生成个性化问题
+   - 使用 `QuestionGenerator` 根据患者背景创建问题列表
+   - 将生成的问题保存到临时脚本文件
+
+2. **对话代理初始化**
+   - 创建 `InterviewerAgent` 实例
+   - 使用默认或个性化问诊脚本
+   - 启动新的会话日志记录
+
+3. **错误处理**
+   - 捕获并记录初始化过程中的异常
+   - 返回初始化是否成功的布尔值
+
+##### 工作流程示例
+
+```python
+# 创建会话实例
+session = InterviewSession(openai_client)
+
+# 初始化对话代理（可选：传入患者信息）
+await session.initialize_agent(patient_info={
+    "age": 45,
+    "gender": "male",
+    "medical_history": "高血压"
+})
+
+# 开始问诊
+agent = session.agent
+response = await agent.generate_next_question()
+### 4. 前端界面 (`server/templates/index.html`)
+
+#### 主要功能
+- 提供用户交互界面
+- 支持语音、文本、图像输入
+- 实时显示对话历史
+- 管理患者信息
+
+## 技术栈
+
+- 后端: Python, Flask, FastAPI, SocketIO
+- 前端: HTML5, JavaScript
+- 语音处理: 语音识别、文本转语音
+- AI 模型: OpenAI GPT 系列
+
+## 系统工作流程
+
+1. 用户打开网页
+2. 输入/上传患者信息
+3. 系统初始化对话代理
+4. 开始智能问诊交互
+5. 支持多模态输入（文本、语音、图像）
+6. 实时更新对话历史
+
+## 配置管理
+
+系统使用 YAML 配置文件管理各模块参数，支持灵活配置和模块替换。
+
+
+
+

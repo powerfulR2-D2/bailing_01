@@ -1,0 +1,230 @@
+{
+  "questions": [
+    {
+      "id": "greeting",
+      "question": "您好，欢迎您来这里。我是这次访谈的心理健康评估专家。这次访谈的目的是为了更好地了解您的整体情况，以便为您提供更合适的帮助。整个过程就像一次聊天，我会问您一些问题，您可以根据自己的情况自由回答。请您放松心情，不用担心，我们会对您的所有信息严格保密。现在，我们开始吧。",
+      "type": "instruction"
+    },
+    {
+      "id": "depression_module",
+      "question": "您提到最近半年情绪一直不太好，可以详细描述一下吗？比如，您通常会感到什么样的情绪？",
+      "type": "open_ended",
+      "expected_topics": [
+        "depressed mood",
+        "loss of interest",
+        "fatigue",
+        "sleep disturbance",
+        "appetite change",
+        "feelings of worthlessness",
+        "difficulty concentrating"
+      ],
+      "follow_up_questions": [
+        "这种情绪低落是持续的吗？还是间断性的？",
+        "您觉得是什么原因导致了这种情绪变化？",
+        "您觉得这种情绪对您的生活和学习造成了什么影响？"
+      ]
+    },
+    {
+      "id": "suicide_module",
+      "question": "您提到过“活着没意思，会想到结束自己的生命”，可以详细谈谈您当时的想法吗？",
+      "type": "open_ended",
+      "expected_topics": [
+        "suicidal ideation",
+        "suicidal plans",
+        "suicide attempts",
+        "self-harm"
+      ],
+      "follow_up_questions": [
+        "这种想法出现的频率高吗？",
+        "您有没有具体的计划，或者采取过什么行动？",
+        "在您感到最绝望的时候，是什么让您坚持了下来？"
+      ]
+    },
+    {
+      "id": "mania_module",
+      "question": "您提到半个月前曾有过持续2-3天感觉莫名的兴奋话多、精力充沛、自我评价高的情况。方便详细描述一下吗？在这段时间里，您通常是什么样的状态？",
+      "type": "open_ended",
+      "expected_topics": [
+        "elevated mood",
+        "increased energy",
+        "racing thoughts",
+        "rapid speech",
+        "decreased need for sleep",
+        "inflated self-esteem",
+        "risky behavior"
+      ],
+      "follow_up_questions": [
+        "您觉得这种兴奋的状态给您带来了什么影响？",
+        "您觉得这种状态是好的还是不好的？",
+        "在这段时间里，您有没有做过一些事，过后觉得后悔的？"
+      ]
+    },
+    {
+      "id": "panic_disorder",
+      "question": "除了情绪低落，您有没有经历过突然感到非常害怕或不舒服的情况？例如，心跳加速、呼吸困难、头晕等等？",
+      "type": "open_ended",
+      "expected_topics": [
+        "panic attacks",
+        "fear of losing control",
+        "fear of dying",
+        "physical symptoms"
+      ],
+      "follow_up_questions": [
+        "这种感觉通常会持续多久？",
+        "您觉得是什么原因引发了这种感觉？",
+        "您会因为害怕再次出现这种感觉而避免去某些地方或做某些事吗？"
+      ]
+    },
+    {
+      "id": "gad_module",
+      "question": "除了情绪低落和兴奋，您平时容易感到焦虑或担心吗？如果会，您通常会担心什么？",
+      "type": "open_ended",
+      "expected_topics": [
+        "excessive worry",
+        "difficulty controlling worry",
+        "restlessness",
+        "fatigue",
+        "difficulty concentrating",
+        "irritability",
+        "muscle tension",
+        "sleep disturbance"
+      ],
+      "follow_up_questions": [
+        "这种担心会影响您的日常生活吗？",
+        "您通常会担心多长时间？",
+        "您有没有尝试过什么方法来缓解这种担心？"
+      ]
+    },
+    {
+      "id": "social_phobia_module",
+      "question": "您在与人交往时，会不会感到紧张或害怕？比如，在人多的场合或者与陌生人交流时？",
+      "type": "open_ended",
+      "expected_topics": [
+        "fear of social situations",
+        "fear of negative evaluation",
+        "avoidance of social situations",
+        "anxiety symptoms in social situations"
+      ],
+      "follow_up_questions": [
+        "您通常会害怕什么？",
+        "这种害怕会影响您参加社交活动吗？",
+        "您有没有因为害怕社交而回避过某些场合？"
+      ]
+    },
+    {
+      "id": "ocd_module",
+      "question": "您有没有反复出现的想法或冲动，让您感到困扰？或者，您有没有重复做某些事情的习惯，即使您知道这样做没有必要？",
+      "type": "open_ended",
+      "expected_topics": [
+        "obsessions",
+        "compulsions",
+        "time-consuming rituals",
+        "interference with daily life"
+      ],
+      "follow_up_questions": [
+        "这些想法或行为会影响您的日常生活吗？",
+        "您有没有尝试过不去想这些想法或不做这些行为？",
+        "您觉得这些想法或行为给您带来了什么影响？"
+      ]
+    },
+    {
+      "id": "ptsd_module",
+      "question": "您在过去的生活中，有没有经历过什么特别难受或创伤性的事情？",
+      "type": "open_ended",
+      "expected_topics": [
+        "exposure to trauma",
+        "intrusive memories",
+        "avoidance of reminders",
+        "negative thoughts and feelings",
+        "hyperarousal"
+      ],
+      "follow_up_questions": [
+        "这件事对您现在的生活有什么影响吗？",
+        "您是否经常想起这件事，或者做相关的噩梦？",
+        "您有没有因此而回避一些人、地方或活动？"
+      ]
+    },
+    {
+      "id": "alcohol_module",
+      "question": "您平时会喝酒吗？",
+      "type": "open_ended",
+      "expected_topics": [
+        "alcohol use",
+        "alcohol abuse",
+        "alcohol dependence"
+      ],
+      "follow_up_questions": [
+        "您多久喝一次酒？",
+        "您每次喝多少？",
+        "您有没有因为喝酒而遇到过麻烦？"
+      ]
+    },
+    {
+      "id": "substance_module",
+      "question": "您有没有使用过其他的药物或物质，比如毒品或成瘾性药物？",
+      "type": "open_ended",
+      "expected_topics": [
+        "drug use",
+        "drug abuse",
+        "drug dependence"
+      ],
+      "follow_up_questions": [
+        "您使用过哪些药物？",
+        "您多久使用一次？",
+        "您有没有因为使用药物而遇到过麻烦？"
+      ]
+    },
+    {
+      "id": "psychotic_module",
+      "question": "您有没有听到过别人听不到的声音，或者看到过别人看不到的东西？",
+      "type": "open_ended",
+      "expected_topics": [
+        "hallucinations",
+        "delusions",
+        "disorganized thinking",
+        "bizarre behavior"
+      ],
+      "follow_up_questions": [
+        "这些声音或景象是什么时候出现的？",
+        "您相信这些声音或景象是真的吗？",
+        "这些声音或景象对您的生活有什么影响？"
+      ]
+    },
+    {
+      "id": "anorexia_module",
+      "question": "您对自己的体重和体型有什么看法？您是否担心自己过胖，或者为了减肥而采取过什么措施？",
+      "type": "open_ended",
+      "expected_topics": [
+        "fear of weight gain",
+        "body image disturbance",
+        "restrictive eating behaviors",
+        "low body weight"
+      ],
+      "follow_up_questions": [
+        "您对自己的体重有什么目标吗？",
+        "您每天吃多少东西？",
+        "您有没有采取过节食、催吐或过度运动等方式来控制体重？"
+      ]
+    },
+    {
+      "id": "bulimia_module",
+      "question": "您有没有在短时间内吃掉大量食物的经历？之后，您有没有采取什么措施来弥补，比如催吐、使用泻药或过度运动？",
+      "type": "open_ended",
+      "expected_topics": [
+        "binge eating",
+        "compensatory behaviors",
+        "loss of control"
+      ],
+      "follow_up_questions": [
+        "您多久会发生一次暴食？",
+        "您通常会吃些什么？",
+        "在暴食之后，您有什么感觉？"
+      ]
+    },
+    {
+      "id": "closing_instruction",
+      "question": "非常感谢您的配合和坦诚分享，所有的问题都已经问完了。您的回答对我了解您的状况非常有帮助，再次感谢您抽出时间与我交流。",
+      "type": "instruction"
+    }
+  ]
+}

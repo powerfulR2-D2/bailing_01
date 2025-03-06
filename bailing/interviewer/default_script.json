@@ -1,0 +1,180 @@
+{
+    "questions": [
+      {
+        "id": "greeting",
+        "question": "您好！我是 Isabella，接下来我将与您进行一次简短的交流，目的是为了更好地评估您的情绪状况。请您放心，我会尽力营造一个舒适的谈话氛围。您只需要根据最近一周左右的感受，如实地告诉我您的想法就可以了。",
+        "type": "instruction"
+      },
+      {
+        "id": "depressed_mood",
+        "question": "最近心情怎么样？最近一周有没有觉得比较难过，或者提不起劲的时候？",
+        "type": "open_ended",
+        "expected_topics": ["情绪低落", "悲伤", "沮丧"],
+        "follow_up_questions": [
+          "可以具体说说是什么让你觉得难过吗？",
+          "这种提不起劲的感觉，通常会在什么时候比较明显呢？"
+        ]
+      },
+      {
+        "id": "guilt",
+        "question": "好的，那最近有没有觉得自己好像做错了什么事情，或者觉得不值得拥有某些东西？",
+        "type": "open_ended",
+        "expected_topics": ["内疚感", "自责", "不配"],
+        "follow_up_questions": [
+          "可以举个例子吗？",
+          "这种感觉出现的频率高吗？"
+        ]
+      },
+      {
+        "id": "suicide",
+        "question": "最近有没有觉得活着没什么意思，或者想到过不如就这样结束算了？",
+        "type": "open_ended",
+        "expected_topics": ["自杀意念", "死亡想法"],
+        "follow_up_questions": [
+          "这种想法出现的时候，你会怎么排解呢？",
+          "有没有更具体的计划或者想法？"
+        ],
+        "caution": true
+      },
+      {
+        "id": "insomnia_initial",
+        "question": "晚上睡觉怎么样？入睡是不是比平时要慢一些？",
+        "type": "open_ended",
+        "expected_topics": ["入睡困难", "失眠"],
+        "follow_up_questions": [
+          "大概需要多长时间才能入睡呢？",
+          "睡前会做些什么准备吗？"
+        ]
+      },
+      {
+        "id": "insomnia_middle",
+        "question": "睡觉的时候容易醒吗？醒了之后还能很快再睡着吗？",
+        "type": "open_ended",
+        "expected_topics": ["睡眠不宁", "夜醒"],
+        "follow_up_questions": [
+          "一般晚上会醒几次呢？",
+          "醒来后通常会做些什么？"
+        ]
+      },
+      {
+        "id": "insomnia_late",
+        "question": "早上会不会醒得比平时早？醒了之后就很难再睡着吗？",
+        "type": "open_ended",
+        "expected_topics": ["早醒", "早醒失眠"],
+        "follow_up_questions": [
+          "通常会比预期早醒多少时间呢？",
+          "醒来后会觉得很疲惫吗？"
+        ]
+      },
+      {
+        "id": "work_activities",
+        "question": "对于平时的工作、学习或者比较喜欢的活动，最近还有兴趣吗？",
+        "type": "open_ended",
+        "expected_topics": ["工作兴趣", "活动兴趣", "动力"],
+        "follow_up_questions": [
+          "有没有什么以前喜欢做的事情，现在不太想做了？",
+          "是因为什么原因感觉没兴趣了呢？"
+        ]
+      },
+      {
+        "id": "retardation",
+        "question": "有没有觉得脑子反应变慢了，或者做事情比平时更费力？",
+        "type": "open_ended",
+        "expected_topics": ["思维迟缓", "行动迟缓", "精力不足"],
+        "follow_up_questions": [
+          "在哪些方面感觉反应变慢了呢？",
+          "做哪些事情会觉得比较吃力？"
+        ]
+      },
+      {
+        "id": "agitation",
+        "question": "最近有没有觉得心里有些烦躁，坐不住，或者老想动？",
+        "type": "open_ended",
+        "expected_topics": ["激越", "烦躁", "不安"],
+        "follow_up_questions": [
+          "这种烦躁的感觉通常在什么时候比较明显？",
+          "有没有什么方法能让您感觉好一些？"
+        ]
+      },
+      {
+        "id": "psychic_anxiety",
+        "question": "最近有没有觉得比较容易紧张、担心，或者感到害怕？",
+        "type": "open_ended",
+        "expected_topics": ["焦虑", "精神性焦虑", "担忧"],
+        "follow_up_questions": [
+          "通常会担心哪些方面的事情呢？",
+          "这种担心会影响到您的日常生活吗？"
+        ]
+      },
+      {
+        "id": "somatic_anxiety",
+        "question": "有没有因为紧张或者担心，身体上也出现一些不舒服，比如心慌、出汗或者胃部不适？",
+        "type": "open_ended",
+        "expected_topics": ["躯体性焦虑", "身体不适", "焦虑症状"],
+        "follow_up_questions": [
+          "除了这些，还有其他的身体不适吗？",
+          "这些不舒服的感觉会持续多久呢？"
+        ]
+      },
+      {
+        "id": "gastrointestinal_symptoms",
+        "question": "最近吃饭怎么样？有没有觉得没什么胃口，或者肚子不舒服？",
+        "type": "open_ended",
+        "expected_topics": ["胃肠道症状", "食欲不振", "消化不良"],
+        "follow_up_questions": [
+          "有没有出现恶心或者其他不适？",
+          "食欲不好的情况持续多久了？"
+        ]
+      },
+      {
+        "id": "general_somatic_symptoms",
+        "question": "有没有觉得身上没力气，容易觉得累，或者头痛，有没有其他地方不舒服？",
+        "type": "open_ended",
+        "expected_topics": ["全身性症状", "疲劳", "疼痛"],
+        "follow_up_questions": [
+          "这种疲惫感会影响到您做其他事情吗？",
+          "除了头痛，还有其他地方会觉得不舒服吗？"
+        ]
+      },
+      {
+        "id": "genital_symptoms",
+        "question": "最近在那方面（性生活方面）的想法有没有什么变化？",
+        "type": "open_ended",
+        "expected_topics": ["性症状", "性欲减退"],
+        "follow_up_questions": [
+          "和以前相比，有没有觉得有什么不同？",
+          "这种变化让您感到困扰吗？"
+        ]
+      },
+      {
+        "id": "hypochondriasis",
+        "question": "最近有没有比较担心自己的身体健康方面的问题？",
+        "type": "open_ended",
+        "expected_topics": ["疑病症", "健康焦虑"],
+        "follow_up_questions": [
+          "主要担心哪些方面呢？",
+          "会因为这些担心去做检查吗？"
+        ]
+      },
+      {
+        "id": "loss_of_weight",
+        "question": "最近体重有变化吗？有没有觉得变轻了或者变重了？",
+        "type": "open_ended",
+        "expected_topics": ["体重减轻", "体重变化"],
+        "follow_up_questions": [
+          "大概轻了或者重了多少呢？",
+          "这种变化是最近才发生的吗？"
+        ]
+      },
+      {
+        "id": "insight",
+        "question": "您觉得自己目前的状态和以前相比，有什么不一样的地方吗？",
+        "type": "open_ended",
+        "expected_topics": ["自知力", "病识感"],
+        "follow_up_questions": [
+          "您觉得是什么原因导致了这些不同呢？",
+          "这些变化对您的生活有什么影响吗？"
+        ]
+      }
+    ]
+  }

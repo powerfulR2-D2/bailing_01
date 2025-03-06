@@ -1,0 +1,92 @@
+name: 百聆（bailing） 
+version: 1.0
+
+logging:
+  level: debug
+
+# 唤醒词
+WakeWord: 百聆
+
+interrupt: false
+# 是否开启工具调用
+StartTaskMode: true
+# 具体处理时选择的模块
+selected_module:
+  Recorder: RecorderPyAudio
+  ASR: FunASR
+  VAD: SileroVAD
+  LLM: OpenAILLM
+  TTS: ByteDanceTTS
+  Player: PygameSoundPlayer
+
+Recorder:
+  RecorderPyAudio:
+    output_file: tmp/
+
+ASR:
+  FunASR:
+    model_dir: models/SenseVoiceSmall
+    output_file: tmp/
+  VoskASR:
+    model_path: model/vosk-model-small-cn-0.22
+    model_name: vosk-model-small-cn-0.22
+    output_file: tmp/
+
+VAD:
+  SileroVAD:
+    sampling_rate: 16000
+    threshold: 0.2
+    min_silence_duration_ms: 1000  # 如果说话停顿比较长，可以把这个值设置大一些
+
+LLM:
+  OpenAILLM:
+    model_name: gpt-4o-mini
+    #url: https://proxyinfo.net/api/v1/client/subscribe?token=e8fda1861dfc7b660e347d273b3df97b
+    url: "https://www.askapi.chat/v1"
+    api_key: "sk-CXXoCNboW8t7jhL7KfrPZ8SkQ1XrU2Qv7KVCr1UT7S7ILorR"
+
+TTS:
+  MacTTS:
+    voice: Tingting
+    output_file: tmp/
+  EdgeTTS:
+    voice: zh-CN-XiaoxiaoNeural
+    output_file: tmp/
+  GTTS:
+    lang: zh
+    output_file: tmp/
+  CosyvoiceTTS:
+    output_file: tmp/
+  CHATTTS:
+    output_file: tmp/
+  ByteDanceTTS:
+    output_file: tmp/
+
+Player:
+  PygameSoundPlayer: null
+  PygamePlayer: null
+  CmdPlayer: null
+  PyaudioPlayer: null
+
+Rag:
+  doc_path: documents/
+  emb_model: models/bge-small-zh
+  model_name: gpt-4o-mini
+  url: https://proxyinfo.net/api/v1/client/subscribe?token=e8fda1861dfc7b660e347d273b3df97b
+  api_key: null
+
+Memory:
+  dialogue_history_path: tmp/
+  memory_file: tmp/memory.json
+  model_name: gpt-4o-mini
+  url: https://proxyinfo.net/api/v1/client/subscribe?token=e8fda1861dfc7b660e347d273b3df97b
+  api_key: null
+
+TaskManager:
+  functions_call_name: plugins/function_calls_config.json
+
+system:
+  initialization_video: 
+    path: "253436_tiny.mp4"
+    auto_play: true
+    description: "系统初始化引导视频"

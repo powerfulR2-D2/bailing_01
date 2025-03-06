@@ -1,0 +1,94 @@
+{
+    "questions": [
+      {
+        "id": "greeting",
+        "question": "您好！我是 Isabella，接下来我将与您进行一次简短的交流，目的是为了更好地评估您的情绪状况。请您放心，我会尽力营造一个舒适的谈话氛围。您只需要根据最近一周左右的感受，如实地告诉我您的想法就可以了。",
+        "type": "instruction"
+      },
+      {
+        "id": "depressed_mood",
+        "question": "最近心情怎么样？最近一周有没有觉得比较难过，或者提不起劲的时候？",
+        "type": "open_ended",
+        "expected_topics": ["情绪低落", "悲伤", "沮丧"],
+        "follow_up_questions": [
+          "可以具体说说是什么让你觉得难过吗？",
+          "这种提不起劲的感觉，通常会在什么时候比较明显呢？"
+        ]
+      },
+      {
+        "id": "insomnia_initial",
+        "question": "image2.png",
+        "type": "image"
+        
+      },
+      {
+        "id": "insomnia_initial",
+        "question": "image3.png",
+        "type": "image"
+      }, 
+           {
+            "id": "insomnia_initial",
+            "question": "image4.png",
+            "type": "image"
+            
+           },
+           {
+            "id": "guilt",
+            "question": "好的，那最近有没有觉得自己好像做错了什么事情，或者觉得不值得拥有某些东西？",
+            "type": "open_ended",
+            "expected_topics": ["内疚感", "自责", "不配"],
+            "follow_up_questions": [
+             "可以举个例子吗？",
+             "这种感觉出现的频率高吗？"
+            ]
+           },
+           {
+            "id": "insomnia_initial",
+            "question": "请看给出的这张图片，我们有时会用‘123……’或者汉语的‘甲乙丙……’来表示顺序。请您按照从数字到汉字并逐渐升高的顺序画一条连线。例如从数字（1）开始，从 1 连向汉字（甲），再连向 2，并一直连下去，到汉字（戊）结束。如果没有什么疑问，请开始连线吧",
+            "type": "image",
+            "image_path":"image3.png"
+            
+           },
+           {
+            "id": "suicide",
+            "question": "最近有没有觉得活着没什么意思，或者想到过不如就这样结束算了？",
+            "type": "open_ended",
+            "expected_topics": ["自杀意念", "死亡想法"],
+            "follow_up_questions": [
+             "这种想法出现的时候，你会怎么排解呢？",
+             "有没有更具体的计划或者想法？"
+            ],
+            "caution": true
+           },
+           {
+            "id": "insomnia_initial",
+            "question": "晚上睡觉怎么样？入睡是不是比平时要慢一些？",
+            "type": "open_ended",
+            "expected_topics": ["入睡困难", "失眠"],
+            "follow_up_questions": [
+             "大概需要多长时间才能入睡呢？",
+             "睡前会做些什么准备吗？"
+            ]
+           },
+           {
+            "id": "insomnia_middle",
+            "question": "睡觉的时候容易醒吗？醒了之后还能很快再睡着吗？",
+            "type": "open_ended",
+            "expected_topics": ["睡眠不宁", "夜醒"],
+            "follow_up_questions": [
+             "一般晚上会醒几次呢？",
+             "醒来后通常会做些什么？"
+            ]
+           },
+           {
+            "id": "insomnia_late",
+            "question": "早上会不会醒得比平时早？醒了之后就很难再睡着吗？",
+            "type": "open_ended",
+            "expected_topics": ["早醒", "夜醒"],
+            "follow_up_questions": [
+             "一般早上会醒几次呢？",
+             "醒来后通常会做些什么？"
+            ]
+           }
+    ]
+}

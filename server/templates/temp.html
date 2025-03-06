@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能问诊</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #e2e2e2 0%, #ffffff 100%);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            background: #007bff;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-bottom: 2px solid #0056b3;
+        }
+        #dialogue-container {
+            flex: 1;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            overflow-y: auto;
+            height: calc(100vh - 100px);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            /* 隐藏滚动条 */
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* Internet Explorer and Edge */
+        }
+        #dialogue-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, and Opera */
+        }
+        .message {
+            position: relative;
+            transition: background 0.3s, transform 0.2s;
+            display: flex;
+            align-items: center;  /* 垂直居中 */
+        }
+        .message.role-user {
+            color: #2e7d32;
+            align-self: flex-start;
+        }
+        .message.role-bot {
+            color: #f57c00;
+            align-self: flex-end;
+        }
+        .message.role-admin {
+            color: #5e35b1;
+            align-self: flex-start;
+        }
+        .message.role-system {
+            color: #37474f;
+            align-self: center;
+            text-align: center;
+        }
+        .role {
+            font-weight: bold;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .message-content {
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 700;
+        }
+        .loading {
+            text-align: center;
+            font-size: 18px;
+            color: #888;
+            margin-top: 20px;
+        }
+        .fade-in {
+            animation: fadeIn 1s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @media (max-width: 600px) {
+            #dialogue-container {
+                padding: 10px;
+                height: calc(100vh - 80px);
+            }
+            .message-content {
+                font-size: 14px;
+            }
+        }
+
+        /* 图片绘制模态框样式 */
+        #imageDrawingModal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        #drawingCanvas {
+            background-color: white;
+            max-width: 90%;
+            max-height: 80%;
+            border: 2px solid #007bff;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .drawing-controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            background-color: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .drawing-controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .drawing-controls button:hover {
+            background-color: #0056b3;
+        }
+        #colorPicker, #lineWidth {
+            margin: 0 10px;
+        }
+
+        /* 录音状态指示器样式 */
+        .recording-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #4CAF50;  /* 监听状态为绿色 */
+            transition: all 0.3s ease;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+        .recording-indicator.active {
+            background-color: #f44336;  /* 录音状态为红色 */
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 10px rgba(244,67,54,0.5);
+        }
+        @keyframes pulse {
+            0% { 
+                transform: scale(1);
+                box-shadow: 0 0 10px rgba(244,67,54,0.5);
+            }
+            50% { 
+                transform: scale(1.1);
+                box-shadow: 0 0 15px rgba(244,67,54,0.7);
+            }
+            100% { 
+                transform: scale(1);
+                box-shadow: 0 0 10px rgba(244,67,54,0.5);
+            }
+        }
+    </style>
+    <!-- WebRTC VAD 库 -->
+    <script src="https://cdn.jsdelivr.net/npm/webrtc-vad@0.1.1/dist/webrtc-vad.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>智能问诊</h1>
+    </header>
+    <div id="patient-info-modal" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1500;
+    ">
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        ">
+            <h2 style="
+                text-align: center;
+                color: #007bff;
+                margin-bottom: 20px;
+            ">患者信息登记</h2>
+            
+            <form id="patient-info-form" style="display: flex; flex-direction: column; gap: 15px;">
+                <div>
+                    <label for="name" style="display: block; margin-bottom: 5px;">姓名</label>
+                    <input type="text" id="name" name="name" required style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    ">
+                </div>
+                
+                <div>
+                    <label for="id-card" style="display: block; margin-bottom: 5px;">身份证号</label>
+                    <input type="text" id="id-card" name="id-card" required pattern="\d{18}" style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    ">
+                </div>
+                
+                <div>
+                    <label for="phone" style="display: block; margin-bottom: 5px;">手机号</label>
+                    <input type="tel" id="phone" name="phone" required pattern="1[3-9]\d{9}" style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    ">
+                </div>
+                
+                <div>
+                    <label for="gender" style="display: block; margin-bottom: 5px;">性别</label>
+                    <select id="gender" name="gender" required style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    ">
+                        <option value="">请选择</option>
+                        <option value="male">男</option>
+                        <option value="female">女</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label for="age" style="display: block; margin-bottom: 5px;">年龄</label>
+                    <input type="number" id="age" name="age" min="0" max="120" required style="
+                        width: 100%;
+                        padding: 10px;
+                        border: 1px solid #ddd;
+                        border-radius: 5px;
+                    ">
+                </div>
+                
+                <button type="submit" style="
+                    background-color: #007bff;
+                    color: white;
+                    border: none;
+                    padding: 12px;
+                    border-radius: 5px;
+                    cursor: pointer;
+                    transition: background-color 0.3s;
+                    margin-top: 10px;
+                ">开始问诊</button>
+            </form>
+        </div>
+    </div>
+    <div id="dialogue-container">
+        <div class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</div>
+    </div>
+    <div id="imageDrawingModal">
+        <canvas id="drawingCanvas"></canvas>
+        <div class="drawing-controls">
+            <label>颜色：<input type="color" id="colorPicker" value="#000000"></label>
+            <label>线宽：<input type="range" id="lineWidth" min="1" max="20" value="5"></label>
+            <button id="clearDrawingBtn">清空</button>
+            <button id="saveDrawingBtn">保存</button>
+            <button id="closeDrawingBtn">关闭</button>
+        </div>
+    </div>
+    
+    <div class="recording-indicator"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        // 创建全局 AudioContext
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // 全局变量，用于跟踪和控制当前音频
+        let currentAudio = null;
+        let audioController = null;
+
+        function stopCurrentAudio() {
+            if (currentAudio) {
+                try {
+                    // 暂停播放
+                    currentAudio.pause();
+                    
+                    // 重置播放时间
+                    currentAudio.currentTime = 0;
+                    
+                    // 如果有 AbortController，中断播放
+                    if (audioController) {
+                        audioController.abort();
+                    }
+                } catch (error) {
+                    console.error('停止音频时出错:', error);
+                }
+                
+                // 清空当前音频
+                currentAudio = null;
+                audioController = null;
+            }
+        }
+    
+        class ImageInteraction {
+            constructor() {
+                this.modal = document.getElementById('imageDrawingModal');
+                this.canvas = document.getElementById('drawingCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.colorPicker = document.getElementById('colorPicker');
+                this.lineWidthInput = document.getElementById('lineWidth');
+                this.clearBtn = document.getElementById('clearDrawingBtn');
+                this.saveBtn = document.getElementById('saveDrawingBtn');
+                this.closeBtn = document.getElementById('closeDrawingBtn');
+
+                this.isDrawing = false;
+                this.lastX = 0;
+                this.lastY = 0;
+
+                this.setupEventListeners();
+            }
+
+            setupEventListeners() {
+                // 桌面事件
+                this.canvas.addEventListener('mousedown', this.startDrawing.bind(this));
+                this.canvas.addEventListener('mousemove', this.draw.bind(this));
+                this.canvas.addEventListener('mouseup', this.stopDrawing.bind(this));
+                this.canvas.addEventListener('mouseout', this.stopDrawing.bind(this));
+
+                // 触摸事件
+                this.canvas.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+                this.canvas.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+                this.canvas.addEventListener('touchend', this.stopDrawing.bind(this));
+                this.canvas.addEventListener('touchcancel', this.stopDrawing.bind(this));
+
+                this.clearBtn.addEventListener('click', this.clearCanvas.bind(this));
+                this.saveBtn.addEventListener('click', this.saveDrawing.bind(this));
+                this.closeBtn.addEventListener('click', this.closeModal.bind(this));
+            }
+
+            // 处理触摸开始事件
+            handleTouchStart(e) {
+                e.preventDefault(); // 阻止默认触摸行为
+                const touch = e.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                this.isDrawing = true;
+                this.lastX = touch.clientX - rect.left;
+                this.lastY = touch.clientY - rect.top;
+            }
+
+            // 处理触摸移动事件
+            handleTouchMove(e) {
+                e.preventDefault(); // 阻止默认触摸行为
+                if (!this.isDrawing) return;
+
+                const touch = e.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                const currentX = touch.clientX - rect.left;
+                const currentY = touch.clientY - rect.top;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.lastX, this.lastY);
+                this.ctx.lineTo(currentX, currentY);
+                
+                this.ctx.strokeStyle = this.colorPicker.value;
+                this.ctx.lineWidth = this.lineWidthInput.value;
+                this.ctx.lineCap = 'round';
+                this.ctx.stroke();
+
+                this.lastX = currentX;
+                this.lastY = currentY;
+            }
+
+            startDrawing(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                this.isDrawing = true;
+                [this.lastX, this.lastY] = [e.clientX - rect.left, e.clientY - rect.top];
+            }
+
+            draw(e) {
+                if (!this.isDrawing) return;
+
+                const rect = this.canvas.getBoundingClientRect();
+                const currentX = e.clientX - rect.left;
+                const currentY = e.clientY - rect.top;
+
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.lastX, this.lastY);
+                this.ctx.lineTo(currentX, currentY);
+                
+                this.ctx.strokeStyle = this.colorPicker.value;
+                this.ctx.lineWidth = this.lineWidthInput.value;
+                this.ctx.lineCap = 'round';
+                this.ctx.stroke();
+
+                [this.lastX, this.lastY] = [currentX, currentY];
+            }
+
+            stopDrawing() {
+                this.isDrawing = false;
+            }
+
+            clearCanvas() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            saveDrawing() {
+                const dataURL = this.canvas.toDataURL('image/png');
+                
+                // 使用 fetch 上传图片
+                fetch('/upload_drawing', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ image: dataURL })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('图片上传成功:', data);
+                    // 可以在这里添加用户提示
+                    socket.emit('add_message', {
+                        role: 'user',
+                        type: 'image',
+                        content: data.url
+                    });
+                    this.closeModal();
+                })
+                .catch(error => {
+                    console.error('上传失败:', error);
+                });
+            }
+
+            showImage(imageUrl) {
+                const img = new Image();
+                img.onload = () => {
+                    // 设置画布大小为图片大小，但不超过窗口大小
+                    this.canvas.width = Math.min(img.width, window.innerWidth * 0.9);
+                    this.canvas.height = Math.min(img.height, window.innerHeight * 0.9);
+                    
+                    // 绘制原始图片
+                    this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                    this.modal.style.display = 'flex';
+                };
+                img.src = imageUrl;
+            }
+
+            closeModal() {
+                this.modal.style.display = 'none';
+            }
+        }
+
+        const imageInteraction = new ImageInteraction();
+
+        function updateDialogue(dialogue) {
+            const container = document.getElementById('dialogue-container');
+            const existingMessages = container.querySelectorAll('.message');
+
+            const existingCount = existingMessages.length;
+
+            if (existingCount === dialogue.length) {
+                return;
+            }
+
+            stopCurrentAudio();
+            
+            for (let i = existingCount; i < dialogue.length; i++) {
+                const message = dialogue[i];
+                console.log(message)
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message role-' + message.role + ' fade-in';
+                
+                if (message.type === 'draw') {
+                    const img = document.createElement('img');
+                    img.src = message.content;
+                    img.style.maxWidth = '100%';
+                    img.style.cursor = 'pointer';
+
+                    // 点击图片进入绘制模式
+                    img.addEventListener('click', () => {
+                        imageInteraction.showImage(message.content);
+                    });
+
+                    messageDiv.appendChild(img);
+                } else if (message.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = message.content;
+                    img.style.maxWidth = '100%';
+                    img.style.cursor = 'pointer';
+
+                    // 点击放大图片
+                    img.addEventListener('click', () => {
+                        const modal = document.createElement('div');
+                        modal.style.cssText = `
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            background-color: rgba(0,0,0,0.8);
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            z-index: 1000;
+                        `;
+
+                        const enlargedImg = document.createElement('img');
+                        enlargedImg.src = message.content;
+                        enlargedImg.style.cssText = `
+                            max-width: 90%;
+                            max-height: 90%;
+                            object-fit: contain;
+                        `;
+
+                        modal.appendChild(enlargedImg);
+                        modal.addEventListener('click', () => {
+                            document.body.removeChild(modal);
+                        });
+
+                        document.body.appendChild(modal);
+                    });
+
+                    messageDiv.appendChild(img);
+                } else if (message.type === 'audio') {
+                    // 原有音频处理逻辑
+                    const audio = new Audio(message.content);
+                    audioController = new AbortController();
+                    currentAudio = audio;
+
+                    const playPromise = audio.play();
+                    if (playPromise !== undefined) {
+                        playPromise.then(() => {
+                            console.log('音频播放成功');
+                        }).catch((error) => {
+                            console.error('播放失败:', error);
+                        });
+                    }
+                } else if (message.type === 'video') {
+                    const videoElement = document.createElement('video');
+                    videoElement.src = message.video_url;  // 使用 video_url 替代 content
+                    videoElement.style.maxWidth = '100%';
+                    videoElement.controls = true;
+                    videoElement.autoplay = true;
+                    //videoElement.muted = true; // 静音自动播放
+
+                    messageDiv.appendChild(videoElement);
+                } else if (message.type === 'text') {
+                    if (message.need_confirm === 'true') {
+                        // 文本消息
+                        messageDiv.innerHTML = `
+                            <div class="message-content">
+                                ${message.role}：
+                                ${message.content}
+                            </div>
+                            <button id="temporary-button">点击我</button>
+                        `;
+                        // 停止监听并开始录音
+                        voiceRecorder.startRecording();
+
+
+                        // 添加按钮点击事件
+                        setTimeout(() => {
+                            const button = messageDiv.querySelector('#temporary-button');
+                            if (button) {
+                                button.addEventListener('click', function() {
+                                    // 停止录音并恢复监听
+                                    voiceRecorder.stopRecording();
+                                    // 隐藏按钮
+                                    button.style.display = 'none';
+                                });
+                            }
+                        }, 0);
+                    }
+                    // 文本消息
+                    messageDiv.innerHTML = `
+                        <div class="message-content">
+                            ${message.role}：
+                            ${message.content}
+                        </div>
+                    `;
+                } 
+
+                container.appendChild(messageDiv);
+            }
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+
+        // 使用自定义错误处理事件
+        socket.on('connect_error', (error) => {
+            console.error('Socket.IO 连接错误:', error);
+        });
+
+        // 使用自定义事件名称替代保留事件名称
+        socket.on('socket_ready', function(data) {
+            console.log('Socket 准备就绪:', data);
+        });
+
+        socket.on('update_dialogue', function(data) {
+            updateDialogue(data);
+        });
+
+        socket.on('patient_registered', function(data) {
+            // 当患者信息注册成功时，关闭模态框
+            document.getElementById('patient-info-modal').style.display = 'none';
+            
+            // 如果 main.py 启动成功，显示提示
+            if (data.main_process_started) {
+                alert('患者信息登记成功，问诊系统已启动');
+            } else {
+                alert('患者信息登记成功，但启动问诊系统时出现问题');
+            }
+        });
+
+        // 视频上传和准备就绪事件处理
+        socket.on('video_uploaded', function(data) {
+            console.log('收到视频上传通知:', data);
+            
+            // 确保使用完整的视频 URL
+            const videoUrl = data.url.startsWith('http') || data.url.startsWith('/') 
+                ? data.url 
+                : `/${data.url}`;
+            
+            // 创建视频消息
+            const videoMessage = {
+                role: 'system',
+                type: 'video',
+                content: videoUrl,
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('准备添加视频消息:', videoMessage);
+            
+            // 直接更新对话
+            updateDialogue([videoMessage]);
+        });
+
+        socket.on('video_ready', function(data) {
+            console.log('视频准备就绪:', data);
+        });
+
+        document.getElementById('patient-info-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                idCard: document.getElementById('id-card').value,
+                phone: document.getElementById('phone').value,
+                gender: document.getElementById('gender').value,
+                age: document.getElementById('age').value
+            };
+            
+            // 验证身份证号和手机号
+            const idCardRegex = /^\d{18}$/;
+            const phoneRegex = /^1[3-9]\d{9}$/;
+            
+            if (!idCardRegex.test(formData.idCard)) {
+                alert('请输入正确的18位身份证号');
+                return;
+            }
+            
+            if (!phoneRegex.test(formData.phone)) {
+                alert('请输入正确的手机号');
+                return;
+            }
+            
+            // 发送患者信息到服务器
+            socket.emit('patient_info', formData);
+        });
+
+        // Socket.IO 连接事件
+        socket.on('connect', () => {
+            console.log('Socket.IO 连接成功');
+        });
+
+        // 语音监听和录音类
+        class VoiceRecorder {
+            constructor() {
+                this.audioContext = null;
+                this.analyser = null;
+                this.mediaStream = null;
+                this.mediaRecorder = null;
+                this.isRecording = false;
+                this.audioChunks = [];
+                this.recordingIndicator = document.querySelector('.recording-indicator');
+                this.isListeningPaused = false; // 新增标志
+                
+                // 配置参数
+                this.config = {
+                    threshold: 0.1,  // 声音检测阈值
+                    silenceTime: 1000  // 静音多久后停止录音(毫秒)
+                };
+
+                this.silenceStartTime = null;
+            }
+
+            async init() {
+                if (!this.isEnabled) return;  // 如果未启用，直接返回
+                
+                try {
+                    // 请求麦克风权限
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true
+                        } 
+                    });
+
+                    this.mediaStream = stream;
+                    this.audioContext = new AudioContext();
+                    const source = this.audioContext.createMediaStreamSource(stream);
+                    this.analyser = this.audioContext.createAnalyser();
+                    
+                    source.connect(this.analyser);
+                    this.startListening();
+                    
+                    // 初始化录音机
+                    const mimeType = 'audio/webm';
+                    this.mediaRecorder = new MediaRecorder(stream, {
+                        mimeType: mimeType
+                    });
+                    
+                    this.mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) {
+                            this.audioChunks.push(e.data);
+                        }
+                    };
+                    
+                    this.mediaRecorder.onstop = async () => {
+                        try {
+                            const audioBlob = new Blob(this.audioChunks, { type: mimeType });
+                            console.log('录制完成，数据大小:', audioBlob.size, '字节');
+                            
+                            // 转换为 WAV 格式，使用16kHz采样率
+                            const arrayBuffer = await audioBlob.arrayBuffer();
+                            const audioContext = new AudioContext({
+                                sampleRate: 16000  // 设置目标采样率
+                            });
+                            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                            
+                            console.log('音频解码完成，准备转换为WAV格式');
+                            console.log('原始采样率:', audioBuffer.sampleRate);
+                            console.log('声道数:', audioBuffer.numberOfChannels);
+                            console.log('时长:', audioBuffer.duration, '秒');
+                            
+                            // 创建 WAV 文件
+                            const wavData = this.audioBufferToWav(audioBuffer);
+                            const wavBlob = new Blob([wavData], { type: 'audio/wav' });
+                            
+                            // 上传转换后的 WAV 文件
+                            const formData = new FormData();
+                            formData.append('audio', wavBlob, 'recording.wav');
+                            
+                            console.log('开始上传WAV文件，大小:', wavBlob.size, '字节');
+                            
+                            const response = await fetch('/upload_audio', {
+                                method: 'POST',
+                                body: formData
+                            });
+                            
+                            if (!response.ok) {
+                                throw new Error('上传失败');
+                            }
+                            
+                            console.log('音频上传成功');
+                            this.audioChunks = [];
+                        } catch (error) {
+                            console.error('音频处理失败:', error);
+                            alert('音频处理失败: ' + error.message);
+                        }
+                    };
+
+                    console.log('语音监听初始化成功');
+                } catch (error) {
+                    console.error('初始化失败:', error);
+                }
+            }
+
+            // 新增：启用录音功能
+            enable() {
+                this.isEnabled = true;
+                this.init();  // 启用后立即初始化
+                console.log('录音功能已启用');
+            }
+
+            // 新增：禁用录音功能
+            disable() {
+                this.isEnabled = false;
+                this.stopRecording();
+                if (this.mediaStream) {
+                    this.mediaStream.getTracks().forEach(track => track.stop());
+                }
+                if (this.audioContext) {
+                    this.audioContext.close();
+                }
+                this.mediaStream = null;
+                this.audioContext = null;
+                this.analyser = null;
+                console.log('录音功能已禁用');
+            }
+
+            startListening() {
+                const bufferLength = this.analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+
+                const checkAudio = () => {
+                    if (!this.analyser|| this.isListeningPaused) return;
+
+                    this.analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+                    const normalizedVolume = average / 256;  // 归一化音量值(0-1)
+
+                    if (normalizedVolume > this.config.threshold) {
+                        // 检测到声音
+                        this.silenceStartTime = null;
+                        if (!this.isRecording) {
+                            this.startRecording();
+                        }
+                    } else if (this.isRecording) {
+                        // 检测静音
+                        const currentTime = Date.now();
+                        if (!this.silenceStartTime) {
+                            this.silenceStartTime = currentTime;
+                        } else if (currentTime - this.silenceStartTime >= this.config.silenceTime) {
+                            this.stopRecording();
+                        }
+                    }
+
+                    requestAnimationFrame(checkAudio);
+                };
+
+                checkAudio();
+            }
+
+            startRecording() {
+                if (!this.isRecording) {
+                    this.isListeningPaused = true; // 暂停监听
+                    this.isRecording = true;
+                    this.audioChunks = [];
+                    this.mediaRecorder.start();
+                    this.recordingIndicator.classList.add('active');
+                    console.log('开始录音');
+                }
+            }
+
+            stopRecording() {
+                if (this.isRecording) {
+                    this.isListeningPaused = false; // 恢复监听
+                    this.isRecording = false;
+                    this.mediaRecorder.stop();
+                    this.recordingIndicator.classList.remove('active');
+                    console.log('停止录音');
+                }
+            }
+
+            // 添加 WAV 转换方法
+            audioBufferToWav(audioBuffer) {
+                const numChannels = audioBuffer.numberOfChannels;
+                const sampleRate = audioBuffer.sampleRate;
+                const format = 1; // PCM
+                const bitDepth = 16;
+                
+                const bytesPerSample = bitDepth / 8;
+                const blockAlign = numChannels * bytesPerSample;
+                
+                const buffer = audioBuffer.getChannelData(0);
+                const samples = buffer.length;
+                const dataSize = samples * blockAlign;
+                const headerSize = 44;
+                const totalSize = headerSize + dataSize;
+                
+                const arrayBuffer = new ArrayBuffer(totalSize);
+                const view = new DataView(arrayBuffer);
+                
+                // WAV 文件头
+                this.writeString(view, 0, 'RIFF');
+                view.setUint32(4, totalSize - 8, true);
+                this.writeString(view, 8, 'WAVE');
+                this.writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, format, true);
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * blockAlign, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, bitDepth, true);
+                this.writeString(view, 36, 'data');
+                view.setUint32(40, dataSize, true);
+                
+                // 写入音频数据
+                const offset = 44;
+                const data = new Int16Array(samples);
+                for (let i = 0; i < samples; i++) {
+                    const sample = Math.max(-1, Math.min(1, buffer[i]));
+                    data[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                }
+                for (let i = 0; i < samples; i++) {
+                    view.setInt16(offset + i * 2, data[i], true);
+                }
+                
+                return arrayBuffer;
+            }
+
+            // 辅助方法：写入字符串到 DataView
+            writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+        }
+
+        let voiceRecorder;
+
+        // 页面加载完成后创建录音器实例，但不立即初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            voiceRecorder = new VoiceRecorder();
+        });
+
+        // 监听开始录音的信号
+        socket.on('start_recording', () => {
+            console.log('收到开始录音信号');
+            if (voiceRecorder) {
+                voiceRecorder.enable();
+            }
+        });
+
+        // 监听停止录音的信号
+        socket.on('stop_recording', () => {
+            console.log('收到停止录音信号');
+            if (voiceRecorder) {
+                voiceRecorder.disable();
+            }
+        });
+    </script>
+</body>
+</html>
