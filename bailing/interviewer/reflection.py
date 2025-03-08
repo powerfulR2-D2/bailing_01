@@ -118,7 +118,7 @@ class ReflectionModule:
                 # 调用大语言模型
                 completion = await self.client.chat.completions.create(
                     model="gemini-2.0-pro-exp-02-05",
-                    messages=[{"role": "system", "content": prompt}],
+                    messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
                     max_tokens=800
                 )
