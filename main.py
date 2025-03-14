@@ -143,6 +143,7 @@ def push2web(payload, web_url="https://127.0.0.1:5000"):
             headers = {'Content-Type': 'application/json; charset=utf-8'}
             payload = {
                 "type": "text",
+                "role": payload.get("role", "assistant"),
                 "content": message_content,
                 "need_confirm": payload.get("need_confirm")
             }

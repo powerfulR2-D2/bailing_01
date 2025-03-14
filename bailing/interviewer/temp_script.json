@@ -2,238 +2,259 @@
   "questions": [
     {
       "id": "greeting",
-      "question": "您好，kingcrimson先生。我是您的医生doctor2，感谢您今天来参与这次访谈。这次访谈的目的是帮助我更好地了解您最近的心理和情绪状态，以便为您提供更合适的帮助。整个过程大约需要30-60分钟，我会问您一系列关于您感受和经历的问题。请您尽可能坦诚地回答，您的所有回答都会被严格保密。如果您在过程中感到任何不适，请随时告诉我。",
+      "question": "刘东方，您好！我是您的医生doctor3，感谢您今天来参与这次访谈。这次访谈的目的是为了更好地了解您最近一段时间的心理健康状况，以便为您提供更合适的帮助。我会问您一系列关于您情绪、感受和经历的问题，请您尽可能坦诚地回答。您的回答都是保密的，请您放心。整个过程大约需要30-45分钟，如果您感到不适或者需要休息，随时可以告诉我。",
       "type": "instruction",
       "expected_topics": [],
       "follow_up_questions": []
     },
     {
       "id": "depression_module",
-      "question": "kingcrimson先生，您最近两周的心情怎么样？有没有感觉情绪低落、沮丧，或者对平时喜欢的事情失去兴趣？",
+      "question": "刘东方，您最近两周以来，是否经常感到情绪低落、沮丧或者对很多事情失去兴趣呢？",
       "type": "open_ended",
       "expected_topics": [
-        "depressed mood",
-        "loss of interest",
+        "depressed_mood",
+        "loss_of_interest",
         "anhedonia",
-        "sleep disturbance",
-        "appetite change",
         "fatigue",
-        "worthlessness",
+        "sleep_disturbance",
+        "appetite_change",
+        "concentration_problems",
+        "feelings_of_worthlessness",
         "guilt",
-        "concentration difficulty",
-        "suicidal ideation"
+        "suicidal_ideation"
       ],
       "follow_up_questions": [
-        "您能具体描述一下这种低落的情绪是什么样的感觉吗？",
-        "这种情况大概持续多久了？",
-        "您觉得是什么原因导致您出现这些情绪的呢？"
+        "您能详细描述一下这种低落的情绪是什么样的感觉吗？",
+        "您觉得这种情绪影响到您的日常生活了吗，比如工作、学习或者社交？",
+        "这种情况持续多久了？有没有什么特定的事情发生后，您开始有这种感觉？"
       ]
     },
     {
       "id": "suicide_risk",
-      "question": "kingcrimson先生，在您感到情绪低落的时候，有没有过一些比较极端的想法，比如觉得活着没意思，或者想过结束自己的生命？",
+      "question": "刘东方，这个问题可能有点直接，但在我们这样的访谈中很重要。在过去的一个月里，您有没有过想要结束自己生命的想法，或者觉得自己死了会更好的念头？",
       "type": "open_ended",
       "expected_topics": [
-        "suicidal ideation",
-        "suicidal plan",
-        "suicidal intent",
-        "past attempts"
+        "suicidal_ideation",
+        "suicide_plan",
+        "suicide_attempt",
+        "hopelessness",
+        "feeling_trapped"
       ],
       "follow_up_questions": [
-        "您能详细说说这些想法吗？",
-        "您有没有为这些想法做过什么准备？",
-        "您以前有没有过类似的想法或者行为？"
+        "您能告诉我更多关于这些想法的情况吗？",
+        "您有没有考虑过采取什么具体的行动？",
+        "您有没有把这些想法告诉过其他人？"
       ]
     },
     {
       "id": "mania_hypomania",
-      "question": "kingcrimson先生，您有没有过一段时间，感觉自己特别兴奋、精力充沛，甚至不需要睡觉，想法很多，说话也很快？",
+      "question": "刘东方，您有没有经历过一段时间，感觉异常兴奋、精力充沛，甚至不需要怎么睡觉，觉得自己比平时更聪明、更有能力，或者想法特别多，语速也比平时快很多？",
       "type": "open_ended",
       "expected_topics": [
-        "elevated mood",
-        "increased energy",
-        "decreased need for sleep",
-        "racing thoughts",
-        "increased talkativeness",
+        "elevated_mood",
+        "increased_energy",
+        "decreased_need_for_sleep",
+        "racing_thoughts",
+        "increased_talkativeness",
         "grandiosity",
-        "impulsivity",
-        "risk-taking behavior"
+        "distractibility",
+        "increased_goal_directed_activity",
+        "risky_behavior"
       ],
       "follow_up_questions": [
-        "您能描述一下这种兴奋的状态是什么样的吗？",
+        "您能描述一下这种感觉具体是什么样的吗？",
         "这种状态持续了多久？",
-        "您周围的人有没有注意到您这段时间的这些变化？"
+        "您周围的人有没有注意到您这段时间有什么不同？"
       ]
     },
     {
       "id": "panic_disorder",
-      "question": "kingcrimson先生，您有没有突然感到一阵强烈的恐惧或不适，心跳加速、呼吸困难、出汗、发抖，甚至感觉自己快要死了或失去控制？",
+      "question": "刘东方，您有没有突然感到一阵强烈的害怕或不适，心跳加速、呼吸困难、出汗、发抖，甚至感觉自己快要失去控制或者快要死了？",
       "type": "open_ended",
       "expected_topics": [
-        "panic attacks",
-        "unexpected panic attacks",
-        "fear of panic attacks",
-        "avoidance behavior"
+        "panic_attacks",
+        "palpitations",
+        "sweating",
+        "trembling",
+        "shortness_of_breath",
+        "chest_pain",
+        "dizziness",
+        "fear_of_losing_control",
+        "fear_of_dying"
       ],
       "follow_up_questions": [
-        "您能描述一下这种感觉吗？",
+        "您能详细描述一下这种感觉吗？",
         "这种情况多久发生一次？",
-        "您有没有因为害怕再次出现这种情况而避免去某些地方或做某些事情？"
+        "您觉得是什么原因引起的？或者没有任何原因就发生了？"
       ]
     },
     {
       "id": "generalized_anxiety_disorder",
-      "question": "kingcrimson先生，您平时是不是经常容易担心各种事情，即使是一些小事也会让您感到焦虑不安，难以控制？",
+      "question": "刘东方，您是否经常感到过度担心和焦虑，即使是一些小事情也会让您感到不安，难以控制这种担心的情绪？",
       "type": "open_ended",
       "expected_topics": [
-        "excessive worry",
-        "difficulty controlling worry",
+        "excessive_anxiety",
+        "worry",
         "restlessness",
         "fatigue",
-        "concentration difficulty",
+        "difficulty_concentrating",
         "irritability",
-        "muscle tension",
-        "sleep disturbance"
+        "muscle_tension",
+        "sleep_disturbance"
       ],
       "follow_up_questions": [
-        "您通常会担心哪些事情？",
-        "这种担心对您的生活有什么影响？",
-        "您有没有尝试过一些方法来缓解这种焦虑？"
+        "您通常会担心些什么事情呢？",
+        "这种担心的情绪会影响到您的日常生活吗？",
+        "您有没有尝试过什么方法来缓解这种焦虑？"
       ]
     },
     {
       "id": "social_phobia",
-      "question": "kingcrimson先生，您在和别人交往的时候，会不会感到紧张、害怕，担心自己会被别人评价或嘲笑？",
+      "question": "刘东方，您在社交场合或者需要表现自己的时候，会不会感到非常紧张、害怕，担心自己会出丑或者被别人评判？",
       "type": "open_ended",
       "expected_topics": [
-        "fear of social situations",
-        "fear of negative evaluation",
-        "avoidance of social situations",
-        "physical symptoms of anxiety"
+        "fear_of_social_situations",
+        "fear_of_scrutiny",
+        "fear_of_negative_evaluation",
+        "avoidance_of_social_situations",
+        "physical_symptoms_of_anxiety"
       ],
       "follow_up_questions": [
-        "您在哪些社交场合会感到特别紧张？",
+        "您能举例说明一下哪些社交场合会让您感到特别紧张吗？",
         "您会因为害怕而避免参加一些社交活动吗？",
-        "这种紧张对您的生活有什么影响？"
+        "您在这种场合下会有什么身体上的不适吗，比如心跳加速、出汗？"
       ]
     },
     {
       "id": "obsessive_compulsive_disorder",
-      "question": "kingcrimson先生，您有没有一些反复出现的想法、冲动或画面，让您感到很烦恼，但又无法控制？或者您有没有一些重复性的行为，比如反复洗手、检查，不做就觉得不舒服？",
+      "question": "刘东方，您有没有一些反复出现的想法、冲动或者画面，让您感到很困扰，而且您会 চেষ্টা做一些重复性的行为或者思维活动来减轻这种困扰？",
       "type": "open_ended",
       "expected_topics": [
         "obsessions",
         "compulsions",
-        "time spent on obsessions and compulsions",
-        "interference with daily life"
+        "repetitive_thoughts",
+        "repetitive_behaviors",
+        "anxiety",
+        "distress"
       ],
       "follow_up_questions": [
-        "您能具体描述一下这些想法或行为吗？",
-        "您每天花多少时间在这些想法或行为上？",
-        "这些想法或行为对您的生活有什么影响？"
+        "您能举例说明一下这些反复出现的想法或行为是什么吗？",
+        "您觉得这些想法或行为是您自己的，还是外来的？",
+        "您每天会花多少时间在这些想法或行为上？"
       ]
     },
     {
       "id": "post_traumatic_stress_disorder",
-      "question": "kingcrimson先生，您有没有经历过一些非常可怕的事情，比如严重的事故、灾难或者暴力事件，之后一直受到这些事情的困扰，比如反复做噩梦、闪回，或者避免接触与这些事情相关的东西？",
+      "question": "刘东方，您是否经历过一些非常可怕或者创伤性的事件，比如严重的事故、自然灾害或者暴力袭击，之后您会反复回想起这些事件，做噩梦，或者避免接触与事件相关的事物？",
       "type": "open_ended",
       "expected_topics": [
-        "traumatic event",
-        "re-experiencing symptoms",
-        "avoidance symptoms",
-        "negative alterations in cognition and mood",
-        "hyperarousal symptoms"
+        "traumatic_event",
+        "re_experiencing",
+        "nightmares",
+        "flashbacks",
+        "avoidance",
+        "negative_alterations_in_cognitions_and_mood",
+        "hyperarousal"
       ],
       "follow_up_questions": [
-        "您能描述一下那次经历吗？（如果患者愿意分享）",
-        "您现在还会经常想起那次经历吗？",
-        "那次经历对您现在的生活有什么影响？"
+        "您能告诉我更多关于这次经历的情况吗？（如果患者愿意分享）",
+        "这件事对您现在的生活有什么影响？",
+        "您有没有寻求过帮助？"
       ]
     },
     {
-      "id": "alcohol_abuse",
-      "question": "kingcrimson先生，您平时喝酒吗？您喝酒的频率和量大概是多少？",
+      "id": "alcohol_dependence_abuse",
+      "question": "刘东方，您平时喝酒吗？您觉得您喝酒的量是否会对您的生活或健康造成影响？",
       "type": "open_ended",
       "expected_topics": [
-        "alcohol consumption",
-        "frequency of drinking",
-        "quantity of drinking",
-        "problems related to drinking"
+        "alcohol_consumption",
+        "tolerance",
+        "withdrawal",
+        "loss_of_control",
+        "social_problems",
+        "health_problems"
       ],
       "follow_up_questions": [
-        "您有没有因为喝酒而影响到您的工作、学习或生活？",
-        "您有没有尝试过戒酒或减少饮酒量？",
-        "您周围的人有没有对您喝酒表示过担忧？"
+        "您通常多久喝一次酒？每次喝多少？",
+        "您有没有因为喝酒而耽误工作、学习或者其他重要的事情？",
+        "您有没有尝试过戒酒或者减少饮酒量？"
       ]
     },
     {
-      "id": "substance_abuse",
-      "question": "kingcrimson先生，除了酒精之外，您有没有使用过其他的一些药物，比如镇静剂、兴奋剂、止痛药或者毒品？",
+      "id": "substance_dependence_abuse",
+      "question": "刘东方，除了酒精之外，您有没有使用过其他药物，比如镇静剂、兴奋剂或者毒品？您觉得这些药物对您的生活有什么影响？",
       "type": "open_ended",
       "expected_topics": [
-        "substance use",
-        "types of substances used",
-        "frequency of use",
-        "problems related to substance use"
+        "drug_use",
+        "tolerance",
+        "withdrawal",
+        "loss_of_control",
+        "social_problems",
+        "health_problems"
       ],
       "follow_up_questions": [
-        "您为什么要使用这些药物？",
-        "您有没有因为使用这些药物而影响到您的工作、学习或生活？",
-        "您有没有尝试过戒掉这些药物？"
+        "您使用这些药物的频率是怎样的？",
+        "您有没有因为使用这些药物而遇到过什么麻烦？",
+        "您有没有想过要停止使用这些药物？"
       ]
     },
     {
-      "id": "psychotic_disorder",
-      "question": "kingcrimson先生，您有没有听到过别人听不到的声音，或者看到过别人看不到的东西？或者有没有一些奇怪的想法，比如觉得有人在监视您、控制您，或者觉得您自己有一些特殊的能力？",
+      "id": "psychotic_disorders",
+      "question": "刘东方，这个问题可能听起来有点奇怪，但请您如实回答。您有没有听到过别人听不到的声音，或者看到过别人看不到的东西？或者您有没有一些别人觉得很奇怪的想法或信念？",
       "type": "open_ended",
       "expected_topics": [
         "hallucinations",
         "delusions",
-        "disorganized thinking",
-        "disorganized behavior",
-        "negative symptoms"
+        "disorganized_speech",
+        "disorganized_behavior",
+        "negative_symptoms"
       ],
       "follow_up_questions": [
         "您能详细描述一下这些经历吗？",
-        "您觉得这些经历是真实的吗？",
-        "这些经历对您的生活有什么影响？"
+        "这些经历是什么时候开始的？",
+        "您觉得这些经历是真实的吗？"
       ]
     },
     {
       "id": "anorexia_nervosa",
-      "question": "kingcrimson先生，您对自己的体重和体型是怎么看的？您有没有刻意控制自己的饮食，比如节食、催吐或者过度运动？",
+      "question": "刘东方，您对自己的体重和体型有什么看法？您是否会刻意控制自己的饮食，即使体重已经很轻了，还是觉得自己太胖？",
       "type": "open_ended",
       "expected_topics": [
-        "body image distortion",
-        "fear of gaining weight",
-        "restriction of food intake",
-        "compensatory behaviors"
+        "body_image_disturbance",
+        "restriction_of_food_intake",
+        "fear_of_gaining_weight",
+        "low_body_weight"
       ],
       "follow_up_questions": [
-        "您觉得自己现在的体重是过轻、正常还是过重？",
-        "您有没有担心自己会变胖？",
-        "您有没有因为控制体重而影响到您的健康？"
+        "您觉得自己目前的体重是过轻、正常还是过重？",
+        "您会采取什么方法来控制体重？",
+        "您有没有因为体重问题而感到焦虑或困扰？"
       ]
     },
     {
       "id": "bulimia_nervosa",
-      "question": "kingcrimson先生，您有没有过一段时间，控制不住地暴饮暴食，吃很多东西，然后又感到很后悔，想办法把吃进去的东西吐出来或者用其他方法来抵消？",
+      "question": "刘东方，您有没有经历过暴饮暴食，之后又会采取一些措施来防止体重增加，比如催吐、过度运动或者使用泻药？",
       "type": "open_ended",
       "expected_topics": [
-        "binge eating",
-        "compensatory behaviors",
-        "body image concerns"
+        "binge_eating",
+        "compensatory_behaviors",
+        "vomiting",
+        "laxative_use",
+        "excessive_exercise",
+        "body_image_disturbance"
       ],
       "follow_up_questions": [
-        "您能描述一下您暴饮暴食的情况吗？",
-        "您通常会用什么方法来抵消暴饮暴食？",
-        "您对自己的体重和体型是怎么看的？"
+        "您多久会发生一次暴饮暴食？",
+        "您在暴饮暴食之后通常会采取什么措施？",
+        "您对自己的体重和体型有什么看法？"
       ]
     },
     {
       "id": "closing_instruction",
       "question": "非常感谢您的配合和坦诚分享，所有的问题都已经问完了。您的回答对我了解您的状况非常有帮助，再次感谢您抽出时间与我交流。",
-      "type": "instruction"
+      "type": "instruction",
+      "expected_topics": [],
+      "follow_up_questions": []
     }
   ]
 }
