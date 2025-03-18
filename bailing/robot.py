@@ -342,10 +342,18 @@ class Robot(ABC):
             with open(audio_path, 'wb') as f:
                 f.write(audio_data.get('audio', b''))
             logger.info(f"robot_audio_data_音频文件已保存: {audio_path}")
+            # 使用保存的WAV文件进行识别
+            text, _ = self.asr.recognizer(audio_path)
             
-            # 将完整的音频信息放入队列
-            self.audio_queue.put(audio_data)
-            
+            if text:
+                logger.info(f"_listen_audio_streamASR识别结果: {text}")
+                # 将完整的音频信息放入队列
+                self.audio_queue.put(audio_data)
+                if self.current_task:
+                        logger.info("取消当前任务")
+                        self.cancel_current_task()  # 直接调用取消方法
+
+                
         sio.connect('https://localhost:5000')
         sio.wait()
 
@@ -446,16 +454,11 @@ class Robot(ABC):
             return
 
         logger.info(f"ASR识别结果: {text}")
-        """       if self.current_task:
-                        logger.info("取消当前任务")
-                        self.cancel_current_task()  # 直接调用取消方法
-        """
+
+
         if self.callback:
             self.callback({"role": "user", "content": str(text)})
-                    
-        # 取消当前任务（如果有）
-        self.cancel_current_task()
-        
+
         # 创建新的异步任务
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
