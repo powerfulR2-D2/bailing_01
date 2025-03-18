@@ -2,115 +2,113 @@
   "questions": [
     {
       "id": "greeting",
-      "question": "您好，刘先生，我是今天的心理健康评估医生。很高兴能有机会和您聊聊。这次访谈的目的是为了更好地了解您的整体情况，我们会一起使用一个叫做MINI的评估工具，它能帮助我们系统地了解您可能遇到的问题。请您放心，我们谈话的内容都会严格保密。整个过程可能需要大约一个小时，我会问您一些问题，您可以根据自己的真实感受来回答。如果您觉得某个问题不太舒服，可以随时告诉我，我们可以跳过或者稍后再谈。现在，您准备好了吗？",
+      "question": "您好，kingcrimson先生，非常感谢您今天抽出时间来接受这次访谈。我将使用一份名为MINI的评估量表，它能帮助我们更全面地了解您的整体情况。在接下来的交流中，我将问您一些问题，请您尽可能诚实地回答。请您放心，我们谈话的内容都会严格保密。您准备好了吗？",
       "type": "instruction"
     },
     {
       "id": "depression_module",
-      "question": "最近一段时间，您觉得自己的情绪怎么样？有没有出现过长时间的、持续的低落、郁闷，或者对很多事情都提不起兴趣的情况？",
+      "question": "最近一段时间，您感觉情绪怎么样？有没有出现过持续的、长时间的低落、沮丧，或者对很多事情都提不起兴趣的情况？如果有，能具体谈谈吗？",
       "type": "open_ended",
       "expected_topics": [
         "depressed mood",
         "loss of interest or pleasure"
       ],
       "follow_up_questions": [
-        "您能具体描述一下这种低落的心情吗？持续了多久？",
-        "您觉得是什么原因导致了您出现这些情绪？",
-        "这些情绪对您的日常生活和工作学习造成了什么影响吗？"
+        "您能具体描述一下这种低落的心情吗？",
+        "这种情绪会持续多久？",
+        "您觉得是什么原因导致了这种情绪？"
       ]
     },
     {
-      "id": "suicide_module",
-      "question": "刘先生，在您感到情绪低落或者不开心的时候，有没有出现过想要结束自己生命的念头？请您如实告诉我，这对于我们来说非常重要。",
+      "id": "suicide_risk",
+      "question": "在您感到情绪低落的时候，有没有想过结束自己的生命，或者觉得自己活得很痛苦、没有意义？请您坦诚地告诉我。",
       "type": "open_ended",
       "expected_topics": [
         "suicidal ideation",
         "suicide attempt"
       ],
       "follow_up_questions": [
-        "您有过自杀的想法吗？具体是什么样的想法？",
-        "您有没有制定过计划或者尝试过自杀的行为？",
-        "您现在是否还存在自杀的风险？"
+        "这种想法出现的频率高吗？",
+        "您是否有具体的计划？",
+        "您是否曾经尝试过自杀？"
       ]
     },
     {
       "id": "mania_module",
-      "question": "您有没有经历过情绪高涨、非常兴奋，或者比平时更加有活力的情况？",
+      "question": "除了情绪低落，您有没有经历过情绪高涨、非常兴奋，或者精力特别旺盛的时候？比如，比平时更健谈、更冲动，或者睡眠需求减少了？",
       "type": "open_ended",
       "expected_topics": [
         "elevated mood",
         "increased energy",
-        "racing thoughts"
+        "racing thoughts",
+        "decreased need for sleep"
       ],
       "follow_up_questions": [
-        "您能详细描述一下情绪高涨时的感受吗？",
-        "在这种状态下，您的行为有什么变化？",
-        "这种情绪高涨持续了多久？"
+        "这种情绪高涨持续了多久？",
+        "在这种状态下，您做过什么和平时不一样的事情吗？",
+        "您觉得这种状态给您带来了什么影响？"
       ]
     },
     {
       "id": "panic_disorder",
-      "question": "您最近有没有突然感到非常害怕、紧张，或者出现心跳加速、呼吸困难、出汗等身体不适的情况？",
+      "question": "您有没有突然感到非常害怕、恐慌，或者心跳加速、呼吸困难，甚至感觉快要死掉的情况？",
       "type": "open_ended",
       "expected_topics": [
         "panic attacks",
-        "fear of losing control",
+        "fear of dying",
         "physical symptoms of panic"
       ],
       "follow_up_questions": [
-        "这种害怕的感觉持续了多久？",
-        "您在什么情况下更容易出现这种感觉？",
-        "您会因为害怕再次发作而避免去某些地方或者做某些事情吗？"
+        "这种感觉通常持续多久？",
+        "您在什么情况下容易出现这种情况？",
+        "您害怕再次出现这种情况吗？"
       ]
     },
     {
       "id": "gad_module",
-      "question": "除了刚才提到的情况，您平时是否经常感到过度担心、焦虑，或者对很多事情都感到不安？",
+      "question": "您平时容易感到焦虑、紧张、担心吗？这种担心主要是什么方面的？",
       "type": "open_ended",
       "expected_topics": [
         "excessive worry",
-        "restlessness",
-        "difficulty concentrating"
+        "anxiety symptoms"
       ],
       "follow_up_questions": [
-        "您通常会为什么事情而感到焦虑？",
-        "这种焦虑会影响您的睡眠、食欲或者日常活动吗？",
-        "您会因为焦虑而感到身体不适吗？比如肌肉紧张、疲劳等？"
+        "您通常会担心什么事情？",
+        "这种担心会影响您的日常生活吗？",
+        "您有没有感到难以控制这种担心？"
       ]
     },
     {
       "id": "social_phobia",
-      "question": "您在社交场合，比如聚会、公众演讲或者与陌生人交流时，会不会感到害怕、紧张，或者担心自己出丑？",
+      "question": "您在社交场合，比如与人交流、在公共场合发言，或者参加聚会时，会不会感到紧张、害怕，甚至想逃避？",
       "type": "open_ended",
       "expected_topics": [
         "fear of social situations",
-        "fear of scrutiny by others",
         "avoidance of social situations"
       ],
       "follow_up_questions": [
-        "您害怕在哪些社交场合表现？",
-        "您在社交场合会有哪些身体上的不适？",
-        "您会尽量避免参加这些社交活动吗？"
+        "您最害怕哪种社交场合？",
+        "这种害怕会影响您的人际交往吗？",
+        "您会采取什么方式来应对这种害怕？"
       ]
     },
     {
       "id": "ocd_module",
-      "question": "您有没有反复出现一些想法、冲动或者影像，让您感到困扰，或者不得不去做一些重复的行为，比如反复洗手、检查门窗等？",
+      "question": "您有没有反复出现一些想法、冲动或念头，让您感到困扰，或者不得不去做一些重复的行为，比如反复洗手、检查门窗等？",
       "type": "open_ended",
       "expected_topics": [
         "obsessions",
-        "compulsions",
-        "repetitive behaviors"
+        "compulsions"
       ],
       "follow_up_questions": [
-        "这些想法具体是什么？让您感到困扰吗？",
-        "您不得不去做的重复行为是什么？",
-        "如果试图阻止这些行为，您会感到焦虑吗？"
+        "这些想法或行为给您带来了什么困扰？",
+        "您能控制自己不去想这些事情或者不做这些行为吗？",
+        "这些想法或行为会占用您很多时间吗？"
       ]
     },
     {
       "id": "ptsd_module",
-      "question": "您最近有没有经历过什么特别可怕、或者让您感到受到威胁的事情？",
+      "question": "您有没有经历过什么特别可怕、或者让您感到生命受到威胁的事件？比如，事故、暴力事件，或者其他创伤性的经历？",
       "type": "open_ended",
       "expected_topics": [
         "traumatic event",
@@ -119,84 +117,80 @@
         "hyperarousal"
       ],
       "follow_up_questions": [
-        "这件事给您留下了什么深刻的印象？",
-        "您是否会反复想起这件事，或者做相关的噩梦？",
-        "您是否会尽量避免与这件事相关的场景或事物？"
+        "这件事对您现在的生活有什么影响？",
+        "您是否经常会想起这件事？",
+        "您会避免去某些地方或者做某些事情来避免想起这件事吗？"
       ]
     },
     {
-      "id": "alcohol_module",
-      "question": "您平时会喝酒吗？",
+      "id": "alcohol_abuse_module",
+      "question": "您平时有饮酒的习惯吗？喝酒的频率和量大概是多少？",
       "type": "open_ended",
       "expected_topics": [
         "alcohol use",
-        "alcohol abuse",
-        "alcohol dependence"
+        "alcohol abuse"
       ],
       "follow_up_questions": [
-        "您多久喝一次酒？每次喝多少？",
         "您喝酒的目的是什么？",
-        "您有没有因为喝酒而遇到过麻烦？比如影响工作学习、与人发生争吵，或者出现健康问题？"
+        "您觉得喝酒对您的生活有什么影响？",
+        "您有没有因为喝酒而遇到过麻烦？"
       ]
     },
     {
-      "id": "substance_module",
-      "question": "除了酒精，您有没有使用过其他的药物或者成瘾物质，比如大麻、冰毒、摇头丸等？",
+      "id": "substance_abuse_module",
+      "question": "除了酒精，您有没有使用过其他的成瘾物质，比如毒品、药物等？",
       "type": "open_ended",
       "expected_topics": [
-        "drug use",
-        "drug abuse",
-        "drug dependence"
+        "substance use",
+        "substance abuse"
       ],
       "follow_up_questions": [
         "您使用这些物质的频率和量是多少？",
         "您使用这些物质的目的是什么？",
-        "您有没有因为使用这些物质而遇到过麻烦？"
+        "您觉得这些物质对您的生活有什么影响？"
       ]
     },
     {
       "id": "psychotic_disorder_module",
-      "question": "您有没有听到过别人听不到的声音，或者看到过别人看不到的东西？",
+      "question": "您有没有听到过别人听不到的声音，或者看到过别人看不到的东西？您有没有觉得有人在监视您，或者控制您的想法？",
       "type": "open_ended",
       "expected_topics": [
         "hallucinations",
-        "delusions",
-        "disorganized thinking"
+        "delusions"
       ],
       "follow_up_questions": [
-        "您听到的声音是什么？",
-        "您看到的景象是什么？",
-        "您有没有觉得别人在监视您，或者对您不利？"
+        "您能具体描述一下您听到的声音或看到的东西吗？",
+        "您相信这些是真的吗？",
+        "这些经历给您带来了什么影响？"
       ]
     },
     {
       "id": "anorexia_module",
-      "question": "您对自己的身材和体重是否感到过度的担心？",
+      "question": "您对自己的身材和体重满意吗？您有没有节食、催吐，或者过度运动来控制体重？",
       "type": "open_ended",
       "expected_topics": [
-        "fear of weight gain",
-        "body image distortion",
-        "restricted eating"
+        "fear of gaining weight",
+        "body image disturbance",
+        "restrictive eating behaviors"
       ],
       "follow_up_questions": [
-        "您对自己的体重有什么看法？",
-        "您有没有节食或者过度运动来控制体重？",
-        "您最近的体重有什么变化？"
+        "您对自己的理想体重有什么想法？",
+        "您觉得自己对食物的态度是怎样的？",
+        "您觉得体重对您来说重要吗？"
       ]
     },
     {
       "id": "bulimia_module",
-      "question": "您有没有在短时间内吃掉大量食物，并且感到无法控制的情况？",
+      "question": "您有没有在短时间内吃掉大量食物，并且感觉无法控制自己？之后您有没有采取一些措施来弥补，比如催吐、使用泻药等？",
       "type": "open_ended",
       "expected_topics": [
         "binge eating",
-        "compensatory behaviors",
-        "loss of control"
+        "compensatory behaviors"
       ],
       "follow_up_questions": [
-        "您吃掉的食物是什么？",
-        "您在暴食后会采取什么措施来控制体重？比如催吐、使用泻药等？",
-        "您对自己的饮食行为感到内疚或者自责吗？"
+        "您吃东西的时候是什么感觉？",
+        "您采取了什么措施来弥补？",
+        "这种行为给您带来了什么影响？"
       ]
     },
     {

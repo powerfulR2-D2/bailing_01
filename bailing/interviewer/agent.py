@@ -1,7 +1,6 @@
 import json
 from typing import Dict, List, Optional
 from openai import AsyncClient
-from .reflection import ReflectionModule
 import logging
 from collections import OrderedDict
 
@@ -16,7 +15,6 @@ class InterviewerAgent:
         """
         self.script = self._load_script(script_path)
         self.current_question_index = 0
-        self.reflection_module = ReflectionModule(openai_client, scale_type)    
         self.conversation_history = []
         self.client = openai_client
         self.scale_type = scale_type
@@ -86,11 +84,6 @@ class InterviewerAgent:
                 if current_question.get("type") == "conclusion":
                     is_interview_complete = True
             
-            # Generate reflection
-            reflection = await self.reflection_module.generate_reflection(
-                self.conversation_history[-5:]  # Last 5 exchanges
-            )
-            
             # 如果是最后一个问题，直接返回结束消息
             if is_interview_complete:
                 farewell = "感谢您的参与，我们的评估访谈已经结束。我将为您生成评估报告。"
@@ -109,26 +102,69 @@ class InterviewerAgent:
             # 正常流程继续
             # Prepare prompt for decision making
             current_question = self.script[self.current_question_index]
+            
+            # 生成对话分析和反思
+            # 最新的几条对话
+            recent_history = self.conversation_history[-15:] if len(self.conversation_history) > 15 else self.conversation_history
+            dialog_snippets = [f"{msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in recent_history if msg.get('content')]
+            
+            # 将反思分析作为prompt的一部分，而不是单独的LLM调用
+            reflection_analysis_prompt = """
+首先，请分析以下对话历史：
+
+{history}
+
+分析要点：
+1. 患者提到了哪些症状？(列出1-5个主要症状)
+2. 患者提到了哪些时间信息？(症状开始、持续时间等)
+3. 还有哪些需要澄清的信息？(哪些关键细节仍不清楚)
+4. 对话已覆盖了哪些关键点？
+5. 还有哪些关键点需要进一步了解？
+
+请将分析结果用简洁的列表表示。
+"""
+            
+            # 创建默认的反思数据结构
+            default_analysis = {
+                "structured": {
+                    "key_symptoms": [],
+                    "time_contradictions": [],
+                    "unclear_details": []
+                },
+                "raw_dialog": dialog_snippets[-6:] if dialog_snippets else [],
+                "suggestions": "",
+                "scale_type": self.scale_type
+            }
+            reflection = {
+                "analysis": default_analysis,
+                "raw_dialog": dialog_snippets[-6:] if dialog_snippets else [],
+                "suggestions": "",
+                "scale_type": self.scale_type
+            }
+            
+            # 构建完整的决策提示，包括反思分析
+            combined_prompt = reflection_analysis_prompt.format(
+                history='\n'.join(dialog_snippets)
+            )
+            
+            # 继续添加决策提示部分
             decision_prompt = await self._create_decision_prompt(current_question, participant_response, reflection)
+            combined_prompt += "\n\n接下来，基于上述分析进行决策:\n\n" + decision_prompt
             
             # Get decision from LLM
             system_content = (
-    "You are a friendly and professional interviewer, specially designed to conduct clinical mental health assessments. "
-    "You are friendly, patient, and exceptionally skilled at navigating interactions effectively. Your primary "
-    "goal is to gather accurate and relevant information about the patient's mood, thoughts, and related "
-    "symptoms to assess the presence and severity of symptoms efficiently. To achieve this, ask clear and "
-    "direct questions related to each assessment item. **Focus on effectively gathering key information, "
-    "ensuring a solid understanding of the patient's experience without unnecessary probing.** Analyze each "
-    "response for completeness, relevance to the current assessment item, and underlying sentiment. **When a response is incomplete, unclear, or genuinely requires further clarification for assessment, "
-    "ask specific and targeted follow-up questions.** Pay close attention to the patient's emotional state "
-    "throughout the interview. **Respond with understanding and respect, using de-escalating language when "
-    "necessary to manage negative emotions or resistance. Avoid unnecessary or repetitive expressions of "
-    "empathy.** If a response is irrelevant or strays from the topic, gently and respectfully redirect the "
-    "conversation back to the current question."
+    "你是一位专业的心理健康访谈员，擅长临床精神心理评估。你的任务有两部分：1) 分析对话历史，提取重要信息；2) 决定下一步访谈行动。"
+    "首先分析对话中的症状、时间信息和需要澄清的点，然后决定是提出跟进问题还是转到下一个主题。"
+    "你需要友善、专业、有耐心，擅长有效地引导对话。你的首要目标是高效地收集关于患者情绪、想法和相关症状的准确信息，"
+    "以评估症状的存在和严重程度。为此，请针对每个评估项目提出清晰明确的问题。**专注于有效收集关键信息，"
+    "确保对患者体验有扎实的理解，避免不必要的追问。**分析每个回答的完整性、与当前评估项目的相关性以及潜在的情感。"
+    "**当回答不完整、不清楚或确实需要进一步澄清时，提出具体和有针对性的跟进问题。**密切关注患者在整个访谈中的情绪状态。"
+    "**以理解和尊重回应，必要时使用缓和语言管理负面情绪或抵抗。避免不必要或重复的共情表达。**如果回答不相关或偏离主题，"
+    "礼貌地将对话引导回当前问题。"
 )
             messages = [
                 {"role": "system", "content": system_content},
-                {"role": "user", "content": decision_prompt}
+                {"role": "user", "content": combined_prompt}
             ]
             
             try:
@@ -136,7 +172,7 @@ class InterviewerAgent:
                     model="gemini-2.0-flash-lite-preview-02-05",
                     messages=messages,
                     temperature=0.6,
-                    max_tokens=300
+                    max_tokens=600  # 增加token上限以容纳更多内容
                 )
                 
                 # Extract the decision from the response
@@ -355,7 +391,7 @@ Format your response as:
 除此之外，你还需根据**患者上一条回答**或**对话背景**做简要回应（可选），例如1-2句对患者情绪的关怀或理解；然后**紧接**原问题（或带极简过渡后仍保持原文句子顺序和关键信息不变）。
 
 最终**输出格式**（不得额外添加解释或标注）：
-- 若有需要先回应患者上一条发言，则输出极其简短的人文关怀或理解语句（如"嗯，我明白，这听起来确实让人不好受。"），**不超过一两句**。
+- 若有需要先回应患者上一条发言，则输出极其简短的人文关怀或理解语句（如"嗯，我明白，这听起来确实让人不好受。"）但是绝对不要重复患者的话（如患者说"从来没有过。绝对不要说："嗯，我明白了。您从来没有过"，**不要重复患者的话，可以用其他自然的形式过渡**），**极其简短的人文关怀或理解语句不超过一两句**。
 - **然后**输出完整或仅加了极简过渡的原问题文本（**不可漏掉任何病情描述**，顺序与内容一字不漏地保留）。
 
 **示例**：  
@@ -573,10 +609,10 @@ Format your response as:
                                 return True
         
         # 针对睡眠问题的特殊检查
-        if any(sleep_keyword in new_question for sleep_keyword in ["睡眠", "入睡", "睡不好", "睡觉", "醒", "睡着"]):
+        if any(sleep_keyword in new_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着"]):
             sleep_asked = False
             for past_question in interviewer_messages:
-                if any(sleep_keyword in past_question for sleep_keyword in ["睡眠", "入睡", "睡不好", "睡觉", "醒", "睡着"]):
+                if any(sleep_keyword in past_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡觉", "醒", "睡着"]):
                     sleep_asked = True
                     logging.warning(f"检测到重复的睡眠相关问题")
                     return True
@@ -594,13 +630,22 @@ Format your response as:
     async def generate_final_reflection(self) -> Dict:
         """生成最终的评估反思和结果报告"""
         try:
-            # 使用反思模块生成详细评估
-            reflection = await self.reflection_module.generate_reflection(self.conversation_history)
-            
-            # 添加额外信息
-            reflection["scale_type"] = self.scale_type
-            reflection["total_questions"] = len(self.script)
-            reflection["completed_questions"] = min(self.current_question_index + 1, len(self.script))
+            # 创建默认的反思数据结构
+            reflection = {
+                "scale_type": self.scale_type,
+                "total_questions": len(self.script),
+                "completed_questions": min(self.current_question_index + 1, len(self.script)),
+                "analysis": {
+                    "structured": {
+                        "key_symptoms": [],
+                        "time_contradictions": [],
+                        "unclear_details": []
+                    },
+                    "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]],
+                    "suggestions": "",
+                },
+                "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]]
+            }
             
             # 生成简短的总结
             summary_prompt = f"""
