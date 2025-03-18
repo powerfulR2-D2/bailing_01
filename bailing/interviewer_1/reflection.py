@@ -71,7 +71,7 @@ class ReflectionModule:
             )
 
             completion = await self.client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3",
+                model="gemini-2.0-flash-lite-preview-02-05",
                 messages=[{"role": "system", "content": prompt}],
                 temperature=0.3,
                 response_format={"type": "json_object"}

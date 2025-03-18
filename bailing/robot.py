@@ -328,9 +328,7 @@ class Robot(ABC):
             logger.info(f"数据大小: {len(audio_data.get('audio', b''))} 字节")
             
 
-            if self.current_task:
-                logger.info("取消当前任务")
-                self.cancel_current_task()  # 直接调用取消方法
+            
             
             # 保存音频文件
             audio_dir = os.path.join(os.path.dirname(__file__), 'audio_files')
@@ -408,6 +406,7 @@ class Robot(ABC):
         if audio_data is None:
             return
         
+        
         # 从字典中获取音频数据和相关信息
         audio_bytes = audio_data.get('audio', b'')
         if isinstance(audio_bytes, list):
@@ -447,7 +446,10 @@ class Robot(ABC):
             return
 
         logger.info(f"ASR识别结果: {text}")
-
+        """       if self.current_task:
+                        logger.info("取消当前任务")
+                        self.cancel_current_task()  # 直接调用取消方法
+        """
         if self.callback:
             self.callback({"role": "user", "content": str(text)})
                     

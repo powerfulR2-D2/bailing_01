@@ -133,7 +133,7 @@ class InterviewerAgent:
             
             try:
                 response = await self.client.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3",
+                    model="gemini-2.0-flash-lite-preview-02-05",
                     messages=messages,
                     temperature=0.6,
                     max_tokens=300
@@ -372,7 +372,7 @@ Format your response as:
             
             # 提供原问题和对话历史给LLM，让其做出更准确的判断
             response = await self.client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3", # 不要修改模型名称
+                model="gemini-2.0-flash-lite-preview-02-05", # 不要修改模型名称
                 messages=[
                     {"role": "system", "content": final_prompt},
                     {"role": "user", "content": f"原问题：{question_text}\n\n对话历史：{conversation_history_json}"}
@@ -616,7 +616,7 @@ Format your response as:
                 try:
                     # 尝试使用 gemini 模型
                     completion = await self.client.chat.completions.create(
-                        model="deepseek-ai/DeepSeek-V3", # 不要修改模型名称
+                        model="gemini-2.0-flash-lite-preview-02-05", # 不要修改模型名称
                         messages=[{"role": "system", "content": summary_prompt}],
                         temperature=0.3,
                         max_tokens=200
@@ -635,7 +635,7 @@ Format your response as:
                     try:
                         # 尝试使用备用模型
                         completion = await self.client.chat.completions.create(
-                            model="deepseek-ai/DeepSeek-V3", # 备用模型
+                            model="gemini-2.0-flash-lite-preview-02-05", # 备用模型
                             messages=[{"role": "system", "content": summary_prompt}],
                             temperature=0.3,
                             max_tokens=200

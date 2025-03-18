@@ -49,9 +49,9 @@ class QuestionGenerator:
         """
         
         try:
-            logging.info("Generating questions using deepseek-ai/DeepSeek-V3...")
+            logging.info("Generating questions using gemini-2.0-flash-lite-preview-02-05...")
             response = await self.client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3", # 不要修改deepseek-ai/DeepSeek-V3，这是正确的模型名字
+                model="gemini-2.0-flash-lite-preview-02-05", # 不要修改gemini-2.0-flash-lite-preview-02-05，这是正确的模型名字
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}

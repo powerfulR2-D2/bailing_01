@@ -117,7 +117,7 @@ class ReflectionModule:
             try:
                 # 调用大语言模型
                 completion = await self.client.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3",
+                    model="gemini-2.0-flash-lite-preview-02-05",
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
                     max_tokens=800

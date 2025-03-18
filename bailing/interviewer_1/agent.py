@@ -156,7 +156,7 @@ class InterviewerAgent:
             
             try:
                 response = await self.client.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3",
+                    model="gemini-2.0-flash-lite-preview-02-05",
                     messages=messages,
                     temperature=0.6,
                     max_tokens=300
@@ -364,7 +364,7 @@ Format your response as:
 请直接输出针对患者上一次回答的 简洁自然 口语化的回应（如果适用，力求自然融入人文关怀），然后给出 简洁贴心、自然口语化的新问题。务必保持输出的 简洁性 和 自然。'''
             final_prompt = prompt_template.replace("{conversation_history_placeholder}", conversation_history_json)
             response = await self.client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-V3",
+                model="gemini-2.0-flash-lite-preview-02-05",
                 messages=[
                     {"role": "system", "content": final_prompt},
                     {"role": "user", "content": question_text}  # 直接发送原始问题
@@ -450,7 +450,7 @@ Format your response as:
             
             try:
                 completion = await self.client.chat.completions.create(
-                    model="deepseek-ai/DeepSeek-V3",
+                    model="gemini-2.0-flash-lite-preview-02-05",
                     messages=[{"role": "system", "content": summary_prompt}],
                     temperature=0.3,
                     max_tokens=200
