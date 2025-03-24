@@ -42,7 +42,7 @@ LLM:
   OpenAILLM:
     model_name: gpt-4o-mini
     #url: https://proxyinfo.net/api/v1/client/subscribe?token=e8fda1861dfc7b660e347d273b3df97b
-    url: "https://www.askapi.chat/v1"
+    url: "https://www.229991.xyz/v1"
     api_key: "sk-CXXoCNboW8t7jhL7KfrPZ8SkQ1XrU2Qv7KVCr1UT7S7ILorR"
 
 TTS:
