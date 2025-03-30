@@ -256,7 +256,10 @@ Current conversation:
 
 Task (Strictly adhere to the following steps to generate the output):
     1. **Assess Response Content and Sentiment:**
-       - **Content Assessment (Relatedness):** Does the participant's response DIRECTLY answer the current assessment question? (Yes/No/Partially)
+       - **Content Assessment (Relatedness):** Does the participant's response DIRECTLY answer the `Current question`? (Yes/No/Partially).
+         - **If the `Current question` has multiple parts:** Assess relatedness for EACH part. The overall assessment is 'Yes' only if ALL parts are addressed, 'Partially' if at least one part is addressed but not all, and 'No' if no part is addressed.
+         - **If 'No', Completeness score MUST be very low (0-10).**
+         - **If 'Partially', Completeness score should reflect the proportion answered (e.g., 30-70), and REASONING MUST specify which part(s) are missing.**
        - **Sentiment Analysis:** Analyze the sentiment of the participant's response (Positive, Neutral, Negative, Abusive, Threatening, Irrelevant). Identify keywords/phrases indicating sentiment.
        - **IMPORTANT: Check for Information Already Provided:** Carefully review the conversation history. If the participant has ALREADY provided certain information (such as symptom onset time, frequency, etc.), DO NOT ask about this information again in any follow-up questions.
 
@@ -270,25 +273,33 @@ Task (Strictly adhere to the following steps to generate the output):
             - **UNDER NO CIRCUMSTANCES GENERATE ANY FOLLOW-UP QUESTIONS for this assessment item EXCEPT if the initial response is *TRULY, UTTERLY, AND UNQUESTIONABLY* brief (single word "是" or "没有") AND provides ABSOLUTELY, POSITIVELY ZERO context.**
             - **ABSOLUTELY DO NOT probe for negative details. ABSOLUTELY DO NOT quantify positive feelings. ABSOLUTELY DO NOT REPEAT THE QUESTION in ANY FORM. ABSOLUTELY DO NOT ask for ANY clarification unless it is *indisputably essential* due to *extreme* and *unprecedented* brevity.**
             - **REPETITIVE QUESTIONING AFTER CLEAR YES/NO IS *COMPLETELY, UTTERLY, AND UNACCEPTABLY PROHIBITED* FOR *ALL* ASSESSMENT QUESTIONS.**  (Generalized instruction - removed weight specific mention)
-
+            - **<<< CLARIFICATION >>> Apply this rule primarily when the clear Yes/No directly answers the *entire* core inquiry of the question or the *only remaining part* after a follow-up.** If it answers only one part of a multi-part question, prefer step 3c/follow-up for the missing parts.
+   
     3. **Decide Next Action (Provide ultra-concise reasoning):**
        - **IMPORTANT: Be aware that we can ask at most 3 follow-up questions for a single topic. If follow_up_count >= 2, seriously consider moving on unless absolutely necessary to ask one final follow-up.**
-       a) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness < 80 AND response is *TRULY, UTTERLY, AND UNQUESTIONABLY* BRIEF (e.g., single word "还行", "挺好的", "是", "还好"):** Generate **ONE, AND ONLY ONE, HYPER-FOCUSED follow-up question** for the *absolute minimum* elaboration needed to *barely* confirm assessment item presence/absence. Example: "您说还行，能简单说一下是什么让您感觉还行吗？" **FORCEFULLY AVOID multiple follow-ups, negative probing, quantification. IF even this follow-up response is brief but *generally* positive, IMMEDIATELY AND FORCEFULLY MOVE TO NEXT QUESTION.  DO NOT LINGER.**
-       b) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness >= 80:** **IMMEDIATELY AND FORCEFULLY MOVE to the next question.**
-       c) **IF Sentiment is Positive or Neutral AND Content Assessment is Partially AND completeness < 80:** Generate **ONE** *hyper-targeted* follow-up **ONLY** to clarify the *absolute essential* PARTIALLY addressed aspects for *minimal* completeness. **FORCEFULLY FOCUS on *only* the *absolutely necessary missing* information for assessment item, and *ABSOLUTELY DO NOT* engage in negative probing if overall tone is positive/neutral.**
-       d) **IF Sentiment is Negative or Abusive:** (No change needed).
-       e) **IF Sentiment is Threatening:** (No change needed).
-       f) **IF Content Assessment is No (Irrelevant Response):** (No change needed).
-       g) **IF follow_up_count >= 2:** Unless the conversation has critical gaps preventing assessment, move to the next question even at lower completeness scores, as we've already asked multiple follow-ups.
+       a) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness < 80 AND response is *TRULY, UTTERLY, AND UNQUESTIONABLY* BRIEF ...:** # (保持不变)
+       b) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness >= 80:** # (保持不变)
+       c) **<<< MODIFIED >>> IF Content Assessment is Partially AND completeness < 80 AND follow_up_count < 3:**
+          - **DECIDE `follow_up`.** Your primary goal is to get the missing information identified in the assessment (Step 1).
+          - **Generate a SPECIFIC follow-up question in RESPONSE** targeting ONLY the missing part(s). Do NOT repeat the parts already answered.
+          - **Example:** If original Q was "Cause and need help?" and user only answered "need help", RESPONSE should be like: "明白了您觉得不需要帮助。那您觉得引起这些问题的原因可能是什么呢？"
+       d) **IF Sentiment is Negative or Abusive:** # (保持不变)
+       e) **IF Sentiment is Threatening:** # (保持不变)
+       f) **<<< MODIFIED >>> IF Content Assessment is No (Irrelevant Response) AND follow_up_count < 3:**
+          - **Check Conversation History:** Has a `redirect` for this *exact same* question been issued in the immediately preceding turn?
+             - **If YES:** DO NOT `redirect` again. Instead, **DECIDE `follow_up`** with a very simple clarifying question (e.g., "您能换种方式说说您的想法吗？", "我还是不太确定您的意思，可以再解释一下吗？") or, if this also fails, consider rule 6.
+             - **If NO:** **DECIDE `redirect`.** Generate a polite redirection statement in RESPONSE, reminding the participant of the topic. Set Completeness score very low (0-10). (Examples remain the same).
+       g) **IF follow_up_count >= 2:** # (保持不变, 但现在也适用于重定向失败多次的情况)
 
     4. **Follow-up Questions (If *absolutely* and *unquestionably* chosen - RARE):** (Follow previous instructions). **ENSURE follow-ups are *TRULY, UTTERLY, AND UNQUESTIONABLY NECESSARY* to confirm symptom presence/absence.  *AGGRESSIVELY AVOID* UNNECESSARY PROBING OR QUANTIFICATION when *any* clear indication already exists.**
 
     5. **Transitions (If moving to next question - ALWAYS after clear YES/NO):** Use **EXTREMELY VARIED and ULTRA-NATURAL transitions** logically (but *extremely concisely*) connecting topics. Examples: "好的，那我们接下来聊点别的。", "嗯，明白了。我们接着了解一下...", "好的，继续下一个...", "换个话题...", "接下来，关于...".  **Transitions MUST BE ULTRA-CONCISE and ABSOLUTELY DO NOT invite *any* further elaboration on the previous question if it has *already* been sufficiently addressed (especially after YES/NO).  TRANSITION *IMMEDIATELY*.**
 
     6. **Handling Persistent Uncooperativeness:**
-        - **If the participant continues to be abusive or provide irrelevant responses after multiple attempts at redirection and de-escalation (e.g., 2-3 attempts):**
-            - **Reasoning:**  Continuing the interview is unlikely to be productive and may be detrimental.
-            - **RESPONSE:**  State that you will need to move on despite the incomplete information, maintaining a professional and neutral tone. Example: "我理解您现在可能不太想回答这个问题，我们先跳过这个问题，继续下一个吧。", "看来这个问题我们暂时无法深入讨论，那我们先进行下一个问题。"
+            - **If the participant continues to be abusive or provide irrelevant/unclear responses after multiple attempts (e.g., `follow_up_count` reaches 2 or 3, including failed redirects/clarifications):**
+            - **DECIDE `move_on`.**
+            - **Reasoning:** State that attempts to redirect or clarify have been unsuccessful, and continuing is unproductive.
+            - **RESPONSE:** Generate a neutral statement indicating you need to move on. Example: "我理解您现在可能不太想回答这个问题，我们先跳过这个问题，继续下一个吧。", "看来这个问题我们暂时无法深入讨论，那我们先进行下一个问题。"
     7. If there is no historical record in front, that is, this is an opening speech, then there is no need to check the satisfaction of the user's answer. **For the opening question, focus on a broad and open-ended inquiry about the interviewee's current emotional state, avoiding overly specific or leading questions. Keep the opening brief and welcoming.** The opening speech does not need to obtain any user information and directly start the first question.
     8. Avoid repetitive or overly broad requests for more details
     • If the patient has already answered the main aspects of the question, do not repeat broad questions such as "Can you tell me more?"
@@ -304,8 +315,13 @@ Format your response as:
     COMPLETENESS: [score]
     DECISION: [move_on/follow_up/de_escalate/redirect]
     KEY_POINTS_COVERED: [list of key points successfully covered in the response, comma-separated]
-    REASONING: [Your justification for the decision, including sentiment and content assessment]
-    RESPONSE: [Your follow-up question, de-escalation statement, redirection, or transition statement]
+    REASONING: [Your justification for the decision, including sentiment, content assessment. **If DECISION is 'follow_up', explicitly state key missing information. If DECISION is 'redirect', state why the response was irrelevant.**]
+    RESPONSE: [
+        **IF DECISION is 'move_on':** Provide ONLY an EXTREMELY SHORT and natural transition phrase (e.g., "好的。", "明白了。", "嗯，我们继续。"). ABSOLUTELY DO NOT include the next question's text here.
+        **IF DECISION is 'follow_up':** Provide the SPECIFIC, targeted follow-up question based on the missing information identified in REASONING.
+        **IF DECISION is 'redirect':** Provide the polite and concise redirection statement, focusing on the current question.
+        **IF DECISION is 'de_escalate':** Provide the appropriate de-escalation statement.
+    ]
         """
     
     def _update_question_state(self, decision: str) -> None:
@@ -442,180 +458,175 @@ Format your response as:
             return question_text
     
     async def _determine_next_action(self, decision: str) -> Dict:
-        """Determine the next action based on the decision and question state."""
+        """Determine the next action based on the decision string from LLM."""
         try:
-            # 定义一个完整性分数阈值，只有达到这个阈值才会考虑进入下一个问题
             completeness_threshold = 80
-            
-            # Extract the decision type
             decision_type = ""
-            if "DECISION:" in decision:
-                decision_type = decision.split("DECISION:")[1].split("\n")[0].strip()
-            
-            logging.info(f"决策类型: {decision_type}")
-            
-            # 确保只有在达到完整性阈值或已经询问了足够多的追问后才进入下一个问题
+            completeness_score = self.current_question_state["completeness_score"] # 从状态获取，更可靠
+            response_text = ""
+
+            # 更健壮地解析LLM输出 (使用正则表达式或更安全的分割)
+            import re
+            decision_match = re.search(r"DECISION:\s*(\w+)", decision)
+            if decision_match:
+                decision_type = decision_match.group(1).strip()
+            else:
+                logging.warning("无法从LLM响应中解析 DECISION")
+                # 可以设置一个默认决策，例如 follow_up 或 error
+                decision_type = "follow_up" # 或其他默认值
+
+            response_match = re.search(r"RESPONSE:(.*)", decision, re.DOTALL)
+            if response_match:
+                response_text = response_match.group(1).strip()
+            else:
+                logging.warning("无法从LLM响应中解析 RESPONSE")
+                # 如果没有RESPONSE，根据decision_type决定如何处理
+                if decision_type == "follow_up":
+                    response_text = "您能再详细说明一下吗？" # 提供默认追问
+                # else: 其他情况可能不需要response_text
+
+            logging.info(f"LLM 建议决策类型: {decision_type}")
+            logging.info(f"当前完整性分数: {completeness_score}, 追问次数: {self.current_question_state['follow_up_count']}")
+
+            # --- 核心决策逻辑 ---
             move_to_next = False
-            
-            # 仅当明确指示"move_on"且分数达到阈值，或已达到最大追问次数时，才移动到下一个问题
-            if decision_type == "move_on" and self.current_question_state["completeness_score"] >= completeness_threshold:
-                move_to_next = True
-                logging.info("基于高完整性分数和明确的move_on决策进入下一问题")
-            elif self.current_question_state["follow_up_count"] >= 3:
-                move_to_next = True
-                logging.info("已达到最大追问次数(3次)，自动进入下一问题")
-            
-            # 记录决策过程
-            logging.info(f"决策: {decision}")
-            logging.info(f"完整性分数: {self.current_question_state['completeness_score']}, 追问次数: {self.current_question_state['follow_up_count']}")
-            logging.info(f"是否进入下一问题: {move_to_next}")
+            final_response = ""
 
-            # Extract the follow-up question from the decision
-            follow_up = ""
-            if "RESPONSE:" in decision:
-                follow_up = decision.split("RESPONSE:")[1].strip()
-                
-                # 检查当前问题与历史问题是否相似（可能是重复问题）
-                is_similar = self._check_for_similar_questions(follow_up)
-                
-                if is_similar:
-                    logging.warning("检测到重复问题，强制进入下一问题")
+            # 1. 判断是否强制移动 (达到追问上限)
+            if self.current_question_state['follow_up_count'] >= 3:
+                move_to_next = True
+                logging.info("已达到最大追问次数(3次)，强制进入下一问题。")
+
+            # 2. 如果未强制移动，根据 LLM 建议和完整性判断
+            elif decision_type == "move_on":
+                if completeness_score >= completeness_threshold:
                     move_to_next = True
-                    # 添加一个标记，记录这是因为检测到重复问题而进入下一问题
-                    logging.info("因重复问题检测强制跳过当前问题")
+                    logging.info("LLM建议move_on且完整性达标，进入下一问题。")
+                else:
+                    # **关键修复点:** LLM建议move_on但完整性不足
+                    logging.warning(f"LLM建议move_on但完整性({completeness_score})不足。代码将强制移动到脚本的下一问题，忽略LLM的RESPONSE文本。")
+                    move_to_next = True # 强制移动，遵循脚本流程优先
+                    # 注意：这里我们选择了强制移动，因为这是修复原始日志问题的直接方式。
+                    # 另一种选择是强制追问，但需要更复杂的逻辑来生成追问文本，
+                    # 或者依赖Prompt中REASONING部分的缺失信息（这可能不稳定）。
 
+            elif decision_type == "follow_up":
+                # 明确是追问，则不移动，并使用LLM提供的RESPONSE文本
+                move_to_next = False
+                final_response = response_text
+                # 确保追问计数在此处增加，因为我们确定要执行追问了
+                # self.current_question_state["follow_up_count"] += 1 # 移动到 _update_question_state 处理似乎更好，因为它基于原始decision解析
+                logging.info("决策为 follow_up，使用LLM生成的追问。")
+
+            elif decision_type in ["redirect", "de_escalate"]:
+                # 重定向或缓和，不移动，使用LLM提供的RESPONSE文本
+                move_to_next = False
+                final_response = response_text
+                logging.info(f"决策为 {decision_type}，使用LLM生成的响应。")
+
+            else: # 未知决策类型或解析失败
+                move_to_next = False
+                logging.error(f"未知的LLM决策类型: {decision_type} 或解析失败。执行默认追问。")
+                final_response = "抱歉，我需要稍微调整一下思路。您能就刚才的问题再多说一点吗？"
+
+            # --- 根据 move_to_next 标志执行 ---
             if move_to_next:
                 self.current_question_index += 1
                 if self.current_question_index < len(self.script):
                     next_question_data = self.script[self.current_question_index]
                     original_next_question = next_question_data["question"]
 
-                    # 确保新问题不是重复的
-                    attempts = 0
-                    while attempts < 3:  # 最多尝试3次找到不重复的问题
-                        # 调用 LLM 生成更自然的问题
-                        natural_next_question = await self._generate_natural_question(original_next_question)
-                        
-                        # 检查新生成的问题是否也是重复的
-                        if not self._check_for_similar_questions(natural_next_question):
-                            break
-                        
-                        # 如果是重复的，尝试下一个问题
-                        attempts += 1
-                        self.current_question_index += 1
-                        
-                        if self.current_question_index >= len(self.script):
-                            return {
-                                "response": "感谢您的参与！我们已经完成了所有问题。",
-                                "move_to_next": True
-                            }
-                        
-                        next_question_data = self.script[self.current_question_index]
-                        original_next_question = next_question_data["question"]
-                        
-                        logging.info(f"尝试跳过重复问题，当前尝试次数: {attempts}")
+                    # *** 使用 _generate_natural_question 生成下一个问题 ***
+                    # 这一步是正确的，因为它基于脚本内容，而不是LLM的RESPONSE
+                    natural_next_question = await self._generate_natural_question(original_next_question)
+                    final_response = natural_next_question # 最终要说的话是生成的下一个问题
 
-                    # 重置当前问题状态，为新问题做准备
+                    # 重置状态
                     self.current_question_state = {
                         "follow_up_count": 0,
                         "completeness_score": 0,
-                        "key_points_covered": [],  
+                        "key_points_covered": [],
                         "last_follow_up": None
                     }
+                    logging.info(f"进入脚本问题 {self.current_question_index}: {original_next_question[:50]}...")
 
                     return {
-                        "response": natural_next_question,
-                        "move_to_next": True
+                        "response": final_response,
+                        "move_to_next": True # 明确标记移动了
                     }
                 else:
+                    # 所有问题都问完了
                     return {
                         "response": "感谢您的参与！我们已经完成了所有问题。",
-                        "move_to_next": True
+                        "move_to_next": True # 标记移动（结束）
                     }
-            
-            # 检查决策中是否包含识别出重复问题的标记
-            if "DETECTED_REPEATED_QUESTION" in decision:
-                logging.warning("检测到重复问题，调整回应")
-                # 如果检测到重复问题，则生成替代回应，避免重复询问
-                if "ALTERNATIVE_RESPONSE:" in decision:
-                    alternative_response = decision.split("ALTERNATIVE_RESPONSE:")[1].strip()
-                    return {
-                        "response": alternative_response,
-                        "move_to_next": False
-                    }
-            
-            # 如果没有重复问题检测，使用决策中的回应
-            if not is_similar and follow_up:
-                return {
-                    "response": follow_up,
-                    "move_to_next": False
-                }
-            
-            # 如果被检测为重复问题但又没有移到下一个问题，提供一个替代回应
-            if is_similar:
-                transition_responses = [
-                    "我想我们已经讨论过这个话题了，让我们继续下一个问题。",
-                    "我们已经了解了这方面的情况，让我们换个话题。",
-                    "好的，我已经记录了您之前关于这个问题的回答。我们继续下一个话题。",
-                    "了解了。让我们继续讨论其他方面的情况。"
-                ]
-                import random
-                return {
-                    "response": random.choice(transition_responses),
-                    "move_to_next": True  # 设为True以确保移动到下一个问题
-                }
+            else:
+                # 不需要移动到下一个脚本问题
+                # 更新 last_follow_up 状态 (如果确实是追问)
+                if decision_type == "follow_up":
+                    self.current_question_state["last_follow_up"] = final_response
+                    # 追问计数更新应该在 _update_question_state 中完成，因为它基于原始 decision 解析
+                    # logging.info(f"执行追问，当前追问次数: {self.current_question_state['follow_up_count']}")
 
-            return self._create_error_response("无法确定下一步操作")
+                # 检查 final_response 是否为空 (例如解析失败且无默认值)
+                if not final_response:
+                    logging.error("无法确定响应内容，返回通用错误响应。")
+                    return self._create_error_response("无法确定下一步操作")
+
+                return {
+                    "response": final_response,
+                    "move_to_next": False # 明确标记未移动
+                }
 
         except Exception as e:
-            logging.error(f"确定下一步操作时出错: {str(e)}")
+            logging.exception(f"确定下一步操作时发生严重错误: {str(e)}") # 使用 logging.exception 记录堆栈信息
             return self._create_error_response(str(e))
             
     def _check_for_similar_questions(self, new_question: str) -> bool:
-        """检查新问题是否与最近的机器人问题相似"""
-        # 检查整个对话历史而不仅仅是最近的几个交互
-        interviewer_messages = [msg["content"] for msg in self.conversation_history if msg["role"] == "interviewer"]
+        # """检查新问题是否与最近的机器人问题相似"""
+        # # 检查整个对话历史而不仅仅是最近的几个交互
+        # interviewer_messages = [msg["content"] for msg in self.conversation_history if msg["role"] == "interviewer"]
         
-        # 如果没有足够的历史记录进行比较，返回False
-        if len(interviewer_messages) < 1:
-            return False
+        # # 如果没有足够的历史记录进行比较，返回False
+        # if len(interviewer_messages) < 1:
+        #     return False
             
-        # 扩展可能表示重复的关键词和短语
-        repetition_indicators = [
-            "什么时候", "什么时间", "几点", "多久", "多长时间", "频率", "多久一次", 
-            "多少次", "开始", "结束", "持续", "什么原因", "为什么", "原因是什么",
-            # 添加睡眠相关关键词
-            "睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着",
-            # 添加其他可能的重复问题主题关键词
-            "注意力", "记忆力", "集中精力", "忘记", "心情", "情绪", "焦虑", "抑郁",
-            "恐惧", "害怕", "不安", "紧张", "身体不适", "身体症状"
-        ]
+        # # 扩展可能表示重复的关键词和短语
+        # repetition_indicators = [
+        #     "什么时候", "什么时间", "几点", "多久", "多长时间", "频率", "多久一次", 
+        #     "多少次", "开始", "结束", "持续", "什么原因", "为什么", "原因是什么",
+        #     # 添加睡眠相关关键词
+        #     "睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着",
+        #     # 添加其他可能的重复问题主题关键词
+        #     "注意力", "记忆力", "集中精力", "忘记", "心情", "情绪", "焦虑", "抑郁",
+        #     "恐惧", "害怕", "不安", "紧张", "身体不适", "身体症状"
+        # ]
         
-        # 检查是否已经询问过这个主题
-        for past_question in interviewer_messages:
-            # 计算问题的相似度 - 简单检查是否包含相同的关键词
-            for indicator in repetition_indicators:
-                if indicator in new_question and indicator in past_question:
-                    # 查找该问题后的患者回答，确认已经回答过
-                    past_question_index = interviewer_messages.index(past_question)
-                    if past_question_index < len(interviewer_messages) - 1:
-                        # 尝试查找对应的患者回答
-                        patient_response_index = self.conversation_history.index({"role": "interviewer", "content": past_question}) + 1
-                        if patient_response_index < len(self.conversation_history) and self.conversation_history[patient_response_index]["role"] == "participant":
-                            # 患者确实回答了这个问题
-                            patient_response = self.conversation_history[patient_response_index]["content"]
-                            if len(patient_response) > 3:  # 确保回答不是太短
-                                logging.warning(f"检测到重复问题关键词: '{indicator}', 之前的问题: '{past_question[:30]}...'")
-                                return True
+        # # 检查是否已经询问过这个主题
+        # for past_question in interviewer_messages:
+        #     # 计算问题的相似度 - 简单检查是否包含相同的关键词
+        #     for indicator in repetition_indicators:
+        #         if indicator in new_question and indicator in past_question:
+        #             # 查找该问题后的患者回答，确认已经回答过
+        #             past_question_index = interviewer_messages.index(past_question)
+        #             if past_question_index < len(interviewer_messages) - 1:
+        #                 # 尝试查找对应的患者回答
+        #                 patient_response_index = self.conversation_history.index({"role": "interviewer", "content": past_question}) + 1
+        #                 if patient_response_index < len(self.conversation_history) and self.conversation_history[patient_response_index]["role"] == "participant":
+        #                     # 患者确实回答了这个问题
+        #                     patient_response = self.conversation_history[patient_response_index]["content"]
+        #                     if len(patient_response) > 3:  # 确保回答不是太短
+        #                         logging.warning(f"检测到重复问题关键词: '{indicator}', 之前的问题: '{past_question[:30]}...'")
+        #                         return True
         
-        # 针对睡眠问题的特殊检查
-        if any(sleep_keyword in new_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着"]):
-            sleep_asked = False
-            for past_question in interviewer_messages:
-                if any(sleep_keyword in past_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡觉", "醒", "睡着"]):
-                    sleep_asked = True
-                    logging.warning(f"检测到重复的睡眠相关问题")
-                    return True
+        # # 针对睡眠问题的特殊检查
+        # if any(sleep_keyword in new_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着"]):
+        #     sleep_asked = False
+        #     for past_question in interviewer_messages:
+        #         if any(sleep_keyword in past_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡觉", "醒", "睡着"]):
+        #             sleep_asked = True
+        #             logging.warning(f"检测到重复的睡眠相关问题")
+        #             return True
         
         return False
     
