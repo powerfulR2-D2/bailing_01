@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Media files
+*.mp4
+*.wav
+
 # C extensions
 *.so
 .idea/
@@ -12,6 +16,9 @@ assets/*.mov
 tmp/
 asset/
 models/SenseVoice*
+
+# Specific generated files
+server/patient_info.json
 
 # Distribution / packaging
 .Python
