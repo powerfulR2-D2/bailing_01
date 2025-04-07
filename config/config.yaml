@@ -40,10 +40,34 @@ VAD:
 
 LLM:
   OpenAILLM:
-    model_name: gpt-4o-mini
-    #url: https://proxyinfo.net/api/v1/client/subscribe?token=e8fda1861dfc7b660e347d273b3df97b
+    model_name: gemini-2.0-flash-lite-preview-02-05
     url: "https://www.229991.xyz/v1"
     api_key: "sk-CXXoCNboW8t7jhL7KfrPZ8SkQ1XrU2Qv7KVCr1UT7S7ILorR"
+  OllamaLLM:
+    model_name: gemma3:27b
+    url: "https://a001-ollama.cpolar.cn"
+    api_key: ""
+
+llm:
+  provider: ollama # Based on selected_module.LLM = OpenAILLM
+  openai:
+    # Using values from LLM:OpenAILLM section
+    api_key: "sk-CXXoCNboW8t7jhL7KfrPZ8SkQ1XrU2Qv7KVCr1UT7S7ILorR" 
+    base_url: "https://www.229991.xyz/v1" 
+    models:
+      # Using model from LLM:OpenAILLM as default for tasks
+      question_generation: "gemini-2.0-flash-lite-preview-02-05" 
+      agent_decision: "gemini-2.0-flash-lite-preview-02-05"      
+      natural_question: "gemini-2.0-flash-lite-preview-02-05"    
+    default_model: "gemini-2.0-flash-lite-preview-02-05"        
+  ollama:
+    # Placeholder values, adjust if switching provider to ollama
+    base_url: "https://a001-ollama.cpolar.cn" 
+    models:
+      question_generation: "gemma3:27b"  
+      agent_decision: "gemma3:27b"       
+      natural_question: "gemma3:27b"     
+    default_model: "gemma3:27b"
 
 TTS:
   MacTTS:

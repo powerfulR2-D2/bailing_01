@@ -13,7 +13,6 @@
 - **支持工具调用**: 灵活集成外部工具，用户可通过语音直接请求信息或执行操作，提升助手的实用性。
 - **支持任务管理**: 高效管理用户任务，能够跟踪进度、设置提醒，并提供动态更新，确保用户不错过任何重要事项。
 
-
 ## 项目简介
 
 百聆通过以下技术组件实现语音对话功能：
@@ -22,7 +21,6 @@
 - **VAD**: 使用 [silero-vad](https://github.com/snakers4/silero-vad) 进行语音活动检测，以确保只处理有效的语音片段。
 - **LLM**: 使用 [deepseek](https://github.com/deepseek-ai/DeepSeek-LLM) 作为大语言模型来处理用户输入并生成响应，极具性价比。
 - **TTS**: 使用 [edge-tts](https://github.com/rany2/edge-tts) [ChatTTS](https://github.com/2noise/ChatTTS) MacOS say进行文本到语音的转换，将生成的文本响应转换为自然流畅的语音。
-
 
 ## 框架说明
 
@@ -54,6 +52,7 @@ Robot 负责高效的任务管理与记忆管理，能够智能地处理用户�
 - **支持记忆功能**: 具备持续学习能力，能够记忆用户的偏好与历史对话，提供个性化的互动体验。
 - **支持工具调用**: 灵活集成外部工具，用户可通过语音直接请求信息或执行操作，提升助手的实用性。
 - **支持任务管理**: 高效管理用户任务，能够跟踪进度、设置提醒，并提供动态更新，确保用户不错过任何重要事项。
+- **访谈代理功能**: 支持专业的心理健康访谈评估，可选择本地大模型或OpenAI兼容API进行访谈。
 
 ## 项目优势
 
@@ -103,6 +102,46 @@ Robot 负责高效的任务管理与记忆管理，能够智能地处理用户�
     python main.py
     ```
 
+## 配置说明
+
+### LLM 配置
+
+百聆项目支持两种 LLM (大语言模型) 运行模式：
+
+1. **本地大模型 (默认)**: 使用 Ollama 在本地运行大语言模型，无需 API 密钥
+2. **OpenAI 兼容 API**: 连接到 OpenAI 或兼容的 API 服务
+
+#### 切换 LLM 模式
+
+##### 使用本地 Ollama 模型 (默认)
+
+系统默认配置为使用本地 Ollama 模型。确保 `bailing/interviewer/config.yaml` 文件中的设置如下：
+
+```yaml
+llm:
+  provider: ollama
+```
+
+同时，您需要在本地安装并运行 [Ollama](https://ollama.ai/)，默认服务地址为 `https://a001-ollama.cpolar.cn`。
+
+##### 切换到 OpenAI 兼容 API
+
+1. 修改 `bailing/interviewer/config.yaml` 文件：
+
+```yaml
+llm:
+  provider: openai
+```
+
+2. 在 `.env` 文件中设置必要的环境变量：
+
+```
+OPENAI_API_KEY="您的API密钥"
+OPENAI_BASE_URL="https://api.openai.com/v1"  # 官方API或兼容服务地址
+```
+
+更多详细配置说明，请参阅 [README_LLM.md](README_LLM.md)。
+
 ## 使用说明
 
 1. 启动应用后，系统会等待语音输入。
@@ -135,9 +174,6 @@ Robot 负责高效的任务管理与记忆管理，能够智能地处理用户�
 | `schedule_task`       | 创建一个定时任务                              | 用户可以指定任务的执行时间和内容，定时提醒用户             | 用户说：“每天早上8点提醒我喝水。” → `time: '08:00', content: '提醒我喝水'` |
 | `open_application`    | 在 Mac 电脑上打开指定的应用程序                | 用户可以指定应用程序的名称，脚本将在 Mac 上启动相应的应用 | 用户说：“打开Safari。” → `application_name: 'Safari'`        |
 | `web_search`          | 在网上搜索指定的关键词                        | 根据用户提供的搜索内容，返回相应的搜索结果                 | 用户说：“搜索最新的科技新闻。” → `query: '最新的科技新闻'`    |
-
-
-
 
 ## 贡献指南
 

@@ -38,7 +38,7 @@ def load_config():
     with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
-def upload_video_to_web(config, web_url="https://127.0.0.1:5000", max_retries=3):
+def upload_video_to_web(config, web_url="https://127.0.0.1:5001", max_retries=3):
     """
     将视频文件上传到Web服务器，带有重试机制和详细的错误处理
 
@@ -119,7 +119,7 @@ def upload_video_to_web(config, web_url="https://127.0.0.1:5000", max_retries=3)
     return None
 
 
-def push2web(payload, web_url="https://127.0.0.1:5000"):
+def push2web(payload, web_url="https://127.0.0.1:5001"):
     """
     将对话消息推送到本地Web服务器，支持文本和语音消息
     

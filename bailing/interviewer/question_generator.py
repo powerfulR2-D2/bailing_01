@@ -1,13 +1,119 @@
 import json
 import os
 import logging
-from typing import Dict, List, Optional
-from openai import AsyncClient
+from typing import Dict, List, Optional, Any
+import httpx
+from openai import AsyncClient as OpenAIAsyncClient
+
+logger = logging.getLogger(__name__)
 
 class QuestionGenerator:
-    def __init__(self, openai_client: AsyncClient):
-        self.client = openai_client
-        
+    def __init__(self, llm_config: Dict):
+        """Initialize QuestionGenerator with LLM configuration."""
+        if not llm_config or not isinstance(llm_config, dict):
+            raise ValueError("llm_config dictionary is required for QuestionGenerator")
+        self.llm_config = llm_config
+        # Initialize a persistent client for Ollama calls
+        self.http_client = httpx.AsyncClient(timeout=120.0) 
+        logger.info("QuestionGenerator initialized.")
+
+    async def close_client(self):
+        """Close the persistent httpx client."""
+        if hasattr(self, 'http_client') and self.http_client:
+            await self.http_client.aclose()
+            logger.info("QuestionGenerator's HTTP client closed.")
+
+    async def _call_llm_for_generation(self, messages: List[Dict], temperature: float) -> Optional[str]:
+        """Calls the appropriate LLM (OpenAI or Ollama) for question generation."""
+        provider = self.llm_config.get("provider")
+        if not provider:
+            logger.error("LLM provider not specified in llm_config.")
+            return None
+
+        logger.debug(f"Attempting LLM call via provider: {provider}")
+
+        try:
+            if provider == "openai":
+                openai_config = self.llm_config.get("openai", {})
+                api_key = openai_config.get("api_key")
+                base_url = openai_config.get("base_url")
+                # Prioritize specific model for question gen, fallback to default, then hardcoded
+                model = openai_config.get("models", {}).get("question_generation", 
+                        openai_config.get("default_model", "gemini-2.0-flash-lite-preview-02-05"))
+                
+                if not api_key:
+                    logger.error("OpenAI API key not found in config.")
+                    return None
+                
+                # Create a temporary client for this call
+                async with OpenAIAsyncClient(api_key=api_key, base_url=base_url, timeout=120.0) as client:
+                    logger.info(f"Calling OpenAI model: {model} for question generation.")
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=messages,
+                        temperature=temperature,
+                        # max_tokens=... # Consider adding max_tokens if needed
+                    )
+                    if response.choices and response.choices[0].message:
+                        content = response.choices[0].message.content
+                        logger.debug(f"OpenAI response received: {content[:100]}...")
+                        return content.strip() if content else None
+                    else:
+                        logger.warning("OpenAI response missing choices or message content.")
+                        return None
+
+            elif provider == "ollama":
+                ollama_config = self.llm_config.get("ollama", {})
+                base_url = ollama_config.get("base_url")
+                 # Prioritize specific model, fallback to default
+                model = ollama_config.get("models", {}).get("question_generation", 
+                        ollama_config.get("default_model"))
+                
+                if not base_url or not model:
+                    logger.error("Ollama base_url or model not found in config.")
+                    return None
+
+                # Ensure base_url ends correctly for the chat endpoint
+                api_url = f"{base_url.rstrip('/')}/api/chat"
+                
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": temperature}
+                }
+                
+                logger.info(f"Calling Ollama model: {model} at {api_url} for question generation.")
+                response = await self.http_client.post(api_url, json=payload)
+                response.raise_for_status() # Raise HTTP errors
+                data = response.json()
+                
+                if data and isinstance(data.get("message"), dict) and "content" in data["message"]:
+                    content = data["message"]["content"]
+                    logger.debug(f"Ollama response received: {content[:100]}...")
+                    return content.strip() if content else None
+                else:
+                    logger.warning(f"Ollama response missing message content. Response: {data}")
+                    return None
+            
+            else:
+                logger.error(f"Unsupported LLM provider: {provider}")
+                return None
+
+        except httpx.RequestError as e:
+            logger.error(f"HTTP request error calling {provider}: {e}")
+            return None
+        except httpx.HTTPStatusError as e:
+             logger.error(f"HTTP status error calling {provider}: {e.response.status_code} - {e.response.text}")
+             return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding JSON response from {provider}: {e}")
+            return None
+        except Exception as e:
+            # Catch potential OpenAI API errors or other unexpected issues
+            logger.error(f"An unexpected error occurred calling {provider} API: {str(e)}", exc_info=True)
+            return None
+
     async def generate_questions(self, patient_info: str, scale_type: str = "hamd") -> List[Dict]:
         """Generate personalized interview questions based on patient information.
         
@@ -48,19 +154,25 @@ class QuestionGenerator:
 }}
         """
         
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
         try:
-            logging.info("Generating questions using gemini-2.0-flash-lite-preview-02-05...")
-            response = await self.client.chat.completions.create(
-                model="gemini-2.0-flash-lite-preview-02-05", # 不要修改gemini-2.0-flash-lite-preview-02-05，这是正确的模型名字
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
+            logging.info("Generating questions using configured LLM...")
+            # Call the internal method to handle provider logic
+            response_text = await self._call_llm_for_generation(
+                messages=messages,
                 temperature=0.7
             )
             
-            # 解析响应并验证格式
-            response_text = response.choices[0].message.content
+            # Check if the LLM call was successful
+            if response_text is None:
+                # Error already logged in _call_llm_for_generation
+                raise ValueError("LLM call failed or returned no content.") 
+            
+            # Logic below uses response_text from the new call 
             logging.info(f"Raw response: {response_text}")
             
             try:
@@ -102,14 +214,18 @@ class QuestionGenerator:
                 raise
             
         except Exception as e:
-            logging.error(f"Error generating questions: {str(e)}")
+            logging.error(f"Error during question generation process (falling back to default): {str(e)}")
             # 返回默认问题
-            default_script_path = os.path.join(os.path.dirname(__file__), "default_script.json")
-            with open(default_script_path, 'r', encoding='utf-8') as f:
-                default_questions = json.load(f)
-                logging.info("Using default questions due to error")
-                return default_questions["questions"]
-    
+            try: 
+                default_script_path = os.path.join(os.path.dirname(__file__), "default_script.json")
+                with open(default_script_path, 'r', encoding='utf-8') as f:
+                    default_questions = json.load(f)
+                    logging.info("Using default questions due to error")
+                    return default_questions["questions"]
+            except Exception as e:
+                logging.error(f"Error reading default questions: {str(e)}")
+                raise
+
     @staticmethod
     def read_patient_info_file(file_path: str) -> str:
         """Read patient information from a text file."""
@@ -148,7 +264,7 @@ class QuestionGenerator:
 
 6. **自然的结束语：** 在生成所有问题之后，添加一个instruction类型的结束语： `{"id": "closing_instruction", "question": "非常感谢您的配合和坦诚分享，所有的问题都已经问完了。您的回答对我了解您的状况非常有帮助，再次感谢您抽出时间与我交流。", "type": "instruction"}` 这个结束语应该平滑地过渡到实际的访谈环节，并再次强调认真倾听。
 
-请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。**"""
+请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。"""
 
     def _get_hama_system_prompt(self) -> str:
         """Return the system prompt for HAMA scale."""
@@ -178,7 +294,7 @@ class QuestionGenerator:
 
 6. **自然的结束语：** 在生成所有问题之后，添加一个instruction类型的结束语： `{"id": "closing_instruction", "question": "非常感谢您的配合和坦诚分享，所有的问题都已经问完了。您的回答对我了解您的状况非常有帮助，再次感谢您抽出时间与我交流。", "type": "instruction"}` 这个结束语应该平滑地过渡到实际的访谈环节，并再次强调认真倾听。
 
-请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。**"""
+请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。"""
 
     def _get_mini_system_prompt(self) -> str:
         """Return the system prompt for MINI scale."""
@@ -210,4 +326,4 @@ class QuestionGenerator:
 
 7. **自然的结束语：** 在生成所有问题之后，添加一个instruction类型的结束语： `{"id": "closing_instruction", "question": "非常感谢您的配合和坦诚分享，所有的问题都已经问完了。您的回答对我了解您的状况非常有帮助，再次感谢您抽出时间与我交流。", "type": "instruction"}` 
 
-请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。**"""
+请确保生成的 JSON 格式正确，所有字段都必须存在。**请注意，最终的输出必须是纯粹的、格式正确的 JSON 对象。除了生成的 JSON 数据外，不要包含任何额外的文本、解释或信息。务必只返回 JSON 数据。"""

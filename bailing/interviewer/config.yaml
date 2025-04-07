@@ -1,0 +1,31 @@
+# LLM Configuration
+llm:
+  # Provider: 'openai' or 'ollama'
+  provider: ollama
+  
+  # OpenAI settings
+  openai:
+    # Base URL - can be overridden by OPENAI_BASE_URL env variable
+    base_url: https://api.openai.com/v1
+    # Model settings - can be overridden by env variables
+    models:
+      default: gpt-4-turbo
+      decision: gpt-4-turbo
+      natural_question: gpt-3.5-turbo
+      reflection: gpt-4-turbo
+  
+  # Ollama (local) settings
+  ollama:
+    # Base URL - can be overridden by LOCAL_LLM_BASE_URL env variable
+    base_url: https://a001-ollama.cpolar.cn
+    # Model settings - can be overridden by env variables
+    models:
+      default: gemma3:27b
+      decision: gemma3:27b
+      natural_question: gemma3:27b
+      reflection: gemma3:27b
+
+# Log settings
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'

@@ -1,30 +1,58 @@
 import json
-from typing import Dict, List, Optional
-from openai import AsyncClient
 import logging
 from collections import OrderedDict
+from typing import Any, Dict, List, Optional
+
+import httpx
+# Use alias for clarity when creating instances later
+from openai import AsyncClient as OpenAIAsyncClient
+
+# Configure logging at the module level (or application entry point)
+# logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# logger = logging.getLogger(__name__) # Using __name__ is standard practice
 
 class InterviewerAgent:
-    def __init__(self, script_path: str, openai_client: AsyncClient, scale_type: str = "hamd"):
-        """Initialize the interviewer agent with an interview script.
+    # def __init__(self, script_path: str, openai_client: AsyncClient, scale_type: str = "hamd"): # Old signature
+    def __init__(self, script_path: str, llm_config: Dict, scale_type: str = "hamd"): # New signature
+        """Initialize the interviewer agent with an interview script and LLM config.
 
         Args:
             script_path (str): The path to the interview script JSON file.
-            openai_client (AsyncClient): The OpenAI client instance.
+            llm_config (Dict): Configuration for the LLM provider (openai or ollama).
+                               Expected structure: {"llm": {"provider": "...", "openai": {...}, "ollama": {...}}}
             scale_type (str): Type of assessment scale (hamd, hama, mini)
         """
         self.script = self._load_script(script_path)
         self.current_question_index = 0
         self.conversation_history = []
-        self.client = openai_client
+        # self.client = openai_client # Removed
+        self.llm_config = llm_config # Added
         self.scale_type = scale_type
         self.current_question_state = {
             "follow_up_count": 0,
             "completeness_score": 0,
-            "key_points_covered": [],  
+            "key_points_covered": [],
             "last_follow_up": None
         }
-        
+        # Initialize shared HTTP client for Ollama and potentially others
+        self._http_client = httpx.AsyncClient(verify=True, timeout=60.0) # Added, verify=True initially
+
+        # Optional: Pre-initialize OpenAI client if provider is openai
+        self._openai_client_instance: Optional[OpenAIAsyncClient] = None # Added
+        if self.llm_config.get("llm", {}).get("provider") == "openai":
+            openai_conf = self.llm_config.get("llm", {}).get("openai", {})
+            api_key = openai_conf.get("api_key")
+            base_url = openai_conf.get("base_url")
+            if api_key: # Only initialize if api_key is provided
+                self._openai_client_instance = OpenAIAsyncClient(
+                    api_key=api_key,
+                    base_url=base_url # base_url can be None, OpenAI client handles default
+                )
+                logging.info("Pre-initialized OpenAI client.")
+            else:
+                logging.warning("OpenAI provider selected, but no API key found in llm_config. Direct calls will fail unless a key is provided later or implicitly.")
+
+
     def _load_script(self, script_path: str) -> List[Dict]:
         """Load the interview script from a JSON file."""
         try:
@@ -168,22 +196,30 @@ class InterviewerAgent:
             ]
             
             try:
-                response = await self.client.chat.completions.create(
-                    model="gemini-2.0-flash-lite-preview-02-05",
+                # response = await self.client.chat.completions.create(
+                #     model="gpt-4-1106-preview",
+                #     messages=messages,
+                #     temperature=0.6,
+                #     max_tokens=600  # 增加token上限以容纳更多内容
+                # )
+                decision_str = await self._call_llm_api(
                     messages=messages,
                     temperature=0.6,
-                    max_tokens=600  # 增加token上限以容纳更多内容
+                    max_tokens=600,
+                    task_type="decision"
                 )
                 
                 # Extract the decision from the response
-                if response.choices:
-                    decision = response.choices[0].message.content
-                    
-                    # Update question state based on the decision
-                    self._update_question_state(decision)
-                    
-                    # Get the next action based on question state
-                    next_action = await self._determine_next_action(decision)
+                if decision_str:
+                    # --- 修正：直接使用 LLM 返回的文本字符串 ---
+                    # decision = json.loads(decision_str) # <--- 移除这一行
+
+                    # Update question state based on the decision string
+                    self._update_question_state(decision_str) # <--- 传递原始字符串
+
+                    # Get the next action based on question state using the string
+                    # <--- _determine_next_action 接收原始字符串
+                    next_action = await self._determine_next_action(decision_str)
                     
                     # Add interviewer's response to conversation history
                     if next_action and "response" in next_action:
@@ -193,7 +229,14 @@ class InterviewerAgent:
                         })
                     
                     # 添加完成标志
-                    next_action["is_interview_complete"] = False
+                    if isinstance(next_action, dict):
+                     next_action["is_interview_complete"] = False
+                    else:
+                        # 处理 _determine_next_action 返回非字典的情况，可能需要返回错误
+                        logging.error(f"_determine_next_action did not return a dictionary: {next_action}")
+                        next_action = self._create_error_response("Internal error determining next action.")
+                        next_action["is_interview_complete"] = False
+
                     return next_action
                 else:
                     error_response = self._create_error_response("No response generated")
@@ -383,13 +426,14 @@ Format your response as:
     
     async def _generate_natural_question(self, question_text: str) -> str:
         """使用LLM生成更自然、更具亲和力的提问，直接返回问题。"""
-        try:
-            # 提取更多对话历史用于上下文分析，增加到最近20条记录
-            recent_history = self.conversation_history[-20:] if len(self.conversation_history) > 20 else self.conversation_history
-            conversation_history_json = json.dumps(recent_history, ensure_ascii=False, indent=2)
-            
-            # 增强提示模板，强调避免重复询问和注意上下文连贯性
-            prompt_template = '''你是一位极其友善、耐心、且具有高度专业素养的医生，正在与患者进行心理健康评估。  
+        logging.info(f"Generating natural question for: {question_text}")
+        
+        # 提取更多对话历史用于上下文分析，增加到最近20条记录
+        recent_history = self.conversation_history[-20:] if len(self.conversation_history) > 20 else self.conversation_history
+        conversation_history_json = json.dumps(recent_history, ensure_ascii=False, indent=2)
+        
+        # 增强提示模板，强调避免重复询问和注意上下文连贯性
+        prompt_template = '''你是一位极其友善、耐心、且具有高度专业素养的医生，正在与患者进行心理健康评估。  
 你的首要目标：  
 1. 确保对患者问话时，**原问题**（由程序或资料提供）中的关键内容、重要细节、句式顺序都被**完整保留**。  
 2. 仅在**确有必要**（例如显得生硬、无衔接）的情况下，为问题**前面**或**后面**添加**极简**的过渡或衔接语，以使对话更流畅自然；如果原问题已足够自然，则**不必做任何修改**。  
@@ -420,44 +464,41 @@ Format your response as:
 
 若原问题完全合适，就照抄。若你需要加一句衔接，则只能轻微加在前后，不得破坏原句。  
 所有文字请**直接输出给用户**作为新的提问，无需任何解释或说明。  '''
-            final_prompt = prompt_template.replace("{conversation_history_placeholder}", conversation_history_json)
-            
-            # 提供原问题和对话历史给LLM，让其做出更准确的判断
-            response = await self.client.chat.completions.create(
-                model="gemini-2.0-flash-lite-preview-02-05", # 不要修改模型名称
-                messages=[
-                    {"role": "system", "content": final_prompt},
-                    {"role": "user", "content": f"原问题：{question_text}\n\n对话历史：{conversation_history_json}"}
-                ],
-                temperature=0.5,  # 降低温度以减少模型自由发挥
-                max_tokens=300  # 适当增加max_tokens以确保完整回答
-            )
-            if response.choices:
-                natural_question = response.choices[0].message.content.strip()
-                
-                # 额外检查：如果生成的问题与原问题基本相同，进行简单的语气调整
-                if natural_question == question_text:
-                    logging.info("生成的问题与原问题相同，添加简单过渡")
-                    transition_phrases = [
-                        "嗯，让我们继续。",
-                        "好的，接下来我想了解，",
-                        "谢谢您的回答。下面，",
-                        "我明白了。那么，",
-                        "谢谢分享。接着，"
-                    ]
-                    import random
-                    transition = random.choice(transition_phrases)
-                    natural_question = f"{transition} {question_text}"
-                
-                return natural_question
+        final_prompt = prompt_template.replace("{conversation_history_placeholder}", conversation_history_json)
+        
+        # 提供原问题和对话历史给LLM，让其做出更准确的判断
+        prompt_messages = [
+            {"role": "system", "content": final_prompt},
+            {"role": "user", "content": f"原问题：{question_text}\n\n对话历史：{conversation_history_json}"}
+        ]
+        
+        natural_question_content = await self._call_llm_api(
+            messages=prompt_messages,
+            temperature=0.7,
+            max_tokens=100,
+            task_type="natural_question"
+        )
+
+        if natural_question_content:
+            natural_question = natural_question_content.strip()
+            # Optional: Add more robust checks (e.g., similarity check) if needed
+            if natural_question: # Ensure it's not empty after stripping
+                 logging.info(f"Generated natural question: {natural_question}")
+                 # Simple check: Ensure it's not identical to the default or empty
+                 if natural_question.lower() != question_text.lower():
+                     return natural_question
+                 else:
+                     logging.warning("Generated natural question was same as default. Using original.")
+                     return question_text # Fallback to original if LLM output is trivial
             else:
-                logging.warning(f"未能生成自然问题，使用原始问题: {question_text}")
-                return question_text
-        except Exception as e:
-            logging.error(f"生成自然问题时出错: {str(e)}")
-            return question_text
-    
-    async def _determine_next_action(self, decision: str) -> Dict:
+                logging.warning("LLM returned empty content for natural question.")
+                return question_text # Fallback if response is empty
+        else:
+            logging.error("LLM call for natural question failed. Returning default.")
+            return question_text # Fallback if API call failed
+
+
+    async def _determine_next_action(self, decision: Dict) -> tuple[str, Optional[str]]:
         """Determine the next action based on the decision string from LLM."""
         try:
             completeness_threshold = 80
@@ -582,61 +623,149 @@ Format your response as:
             logging.exception(f"确定下一步操作时发生严重错误: {str(e)}") # 使用 logging.exception 记录堆栈信息
             return self._create_error_response(str(e))
             
-    def _check_for_similar_questions(self, new_question: str) -> bool:
-        # """检查新问题是否与最近的机器人问题相似"""
-        # # 检查整个对话历史而不仅仅是最近的几个交互
-        # interviewer_messages = [msg["content"] for msg in self.conversation_history if msg["role"] == "interviewer"]
-        
-        # # 如果没有足够的历史记录进行比较，返回False
-        # if len(interviewer_messages) < 1:
-        #     return False
-            
-        # # 扩展可能表示重复的关键词和短语
-        # repetition_indicators = [
-        #     "什么时候", "什么时间", "几点", "多久", "多长时间", "频率", "多久一次", 
-        #     "多少次", "开始", "结束", "持续", "什么原因", "为什么", "原因是什么",
-        #     # 添加睡眠相关关键词
-        #     "睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着",
-        #     # 添加其他可能的重复问题主题关键词
-        #     "注意力", "记忆力", "集中精力", "忘记", "心情", "情绪", "焦虑", "抑郁",
-        #     "恐惧", "害怕", "不安", "紧张", "身体不适", "身体症状"
-        # ]
-        
-        # # 检查是否已经询问过这个主题
-        # for past_question in interviewer_messages:
-        #     # 计算问题的相似度 - 简单检查是否包含相同的关键词
-        #     for indicator in repetition_indicators:
-        #         if indicator in new_question and indicator in past_question:
-        #             # 查找该问题后的患者回答，确认已经回答过
-        #             past_question_index = interviewer_messages.index(past_question)
-        #             if past_question_index < len(interviewer_messages) - 1:
-        #                 # 尝试查找对应的患者回答
-        #                 patient_response_index = self.conversation_history.index({"role": "interviewer", "content": past_question}) + 1
-        #                 if patient_response_index < len(self.conversation_history) and self.conversation_history[patient_response_index]["role"] == "participant":
-        #                     # 患者确实回答了这个问题
-        #                     patient_response = self.conversation_history[patient_response_index]["content"]
-        #                     if len(patient_response) > 3:  # 确保回答不是太短
-        #                         logging.warning(f"检测到重复问题关键词: '{indicator}', 之前的问题: '{past_question[:30]}...'")
-        #                         return True
-        
-        # # 针对睡眠问题的特殊检查
-        # if any(sleep_keyword in new_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡不着", "睡觉", "醒", "睡着"]):
-        #     sleep_asked = False
-        #     for past_question in interviewer_messages:
-        #         if any(sleep_keyword in past_question for sleep_keyword in ["睡眠", "入睡", "失眠", "睡不好", "睡觉", "醒", "睡着"]):
-        #             sleep_asked = True
-        #             logging.warning(f"检测到重复的睡眠相关问题")
-        #             return True
-        
-        return False
-    
-    def _create_error_response(self, error_msg: str) -> Dict:
-        """Create a standardized error response."""
-        logging.error(f"Error in interview process: {error_msg}")
-        return {
-            "response": "I apologize, but I need to process that differently. Could you please elaborate on your previous response?",
-            "move_to_next": False
-        }
+    async def _call_llm_api(self, messages: List[Dict], temperature: float, max_tokens: int, task_type: str = "default") -> Optional[str]:
+        """Calls the configured LLM API (OpenAI or Ollama).
+
+        Args:
+            messages (List[Dict]): The message history/prompt for the LLM.
+            temperature (float): The sampling temperature.
+            max_tokens (int): The maximum number of tokens to generate.
+            task_type (str): A hint for model selection (e.g., "decision", "natural_question", "reflection", "summary"). Defaults to "default".
+
+        Returns:
+            Optional[str]: The content of the LLM's response, or None if an error occurred.
+        """
+        provider_config = self.llm_config.get("llm", {})
+        provider = provider_config.get("provider")
+
+        if not provider:
+            logging.error("LLM provider is not specified in llm_config.")
+            return None
+
+        logging.info(f"Calling LLM provider: {provider} for task: {task_type}")
+
+        try:
+            if provider == "openai":
+                openai_conf = provider_config.get("openai", {})
+                api_key = openai_conf.get("api_key")
+                base_url = openai_conf.get("base_url")
+                # Select model: Use task-specific model if available, else fallback to default model
+                models = openai_conf.get("models", {})
+                model_name = models.get(task_type) or openai_conf.get("model")
+
+                if not model_name:
+                    logging.error(f"No OpenAI model specified for task '{task_type}' or default in llm_config.")
+                    return None
+
+                # Use pre-initialized client if available and valid, otherwise create temporary one (requires api_key)
+                client_to_use = self._openai_client_instance
+                if not client_to_use:
+                    if not api_key:
+                        logging.error("Cannot call OpenAI API: No pre-initialized client and no API key in config.")
+                        return None
+                    logging.warning("Creating temporary OpenAI client for this call.")
+                    client_to_use = OpenAIAsyncClient(api_key=api_key, base_url=base_url)
+                
+                logging.debug(f"OpenAI Request: model={model_name}, temp={temperature}, max_tokens={max_tokens}")
+                # logging.debug(f"OpenAI Messages: {messages}") # Be careful logging full messages
+
+                completion = await client_to_use.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    # Add other parameters like top_p if needed from config
+                )
+
+                if completion.choices and completion.choices[0].message:
+                    response_content = completion.choices[0].message.content
+                    logging.debug(f"OpenAI Response: {response_content[:100]}...") # Log snippet
+                    return response_content
+                else:
+                    logging.warning("OpenAI API returned no choices or message content.")
+                    return None
+
+            elif provider == "ollama":
+                ollama_conf = provider_config.get("ollama", {})
+                base_url = ollama_conf.get("base_url")
+                if not base_url:
+                    logging.error("Ollama base_url is not specified in llm_config.")
+                    return None
+
+                # Select model: Use task-specific model if available, else fallback to default model
+                models = ollama_conf.get("models", {})
+                model_name = models.get(task_type) or ollama_conf.get("model")
+
+                if not model_name:
+                    logging.error(f"No Ollama model specified for task '{task_type}' or default in llm_config.")
+                    return None
+
+                api_url = f"{base_url.rstrip('/')}/api/chat" # Ensure no double slash
+                payload = {
+                    "model": model_name,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens # Ollama uses num_predict for max tokens
+                        # Add other Ollama options here if needed from config
+                    }
+                }
+
+                logging.debug(f"Ollama Request: url={api_url}, model={model_name}, temp={temperature}, max_tokens={max_tokens}")
+                # logging.debug(f"Ollama Payload: {json.dumps(payload)}") # Be careful logging full messages/payload
+
+                response = await self._http_client.post(api_url, json=payload)
+                response.raise_for_status() # Raise HTTPStatusError for bad responses (4xx or 5xx)
+
+                response_data = response.json()
+                if response_data and isinstance(response_data.get("message"), dict) and "content" in response_data["message"]:
+                    response_content = response_data["message"]["content"]
+                    logging.debug(f"Ollama Response: {response_content[:100]}...") # Log snippet
+                    return response_content
+                else:
+                    logging.warning(f"Ollama API response format unexpected or missing content: {response_data}")
+                    return None
+
+            else:
+                logging.error(f"Unsupported LLM provider: {provider}")
+                return None
+
+        except OpenAIAsyncClient.APIConnectionError as e:
+             logging.error(f"OpenAI API request failed: Connection error - {e}")
+             return None
+        except OpenAIAsyncClient.RateLimitError as e:
+             logging.error(f"OpenAI API request failed: Rate limit exceeded - {e}")
+             return None
+        except OpenAIAsyncClient.APIStatusError as e:
+             logging.error(f"OpenAI API request failed: Status {e.status_code} - {e.response}")
+             return None
+        except OpenAIAsyncClient.APITimeoutError as e:
+             logging.error(f"OpenAI API request timed out: {e}")
+             return None
+        except OpenAIAsyncClient.APIError as e: # Catch-all for other OpenAI specific errors
+             logging.error(f"OpenAI API returned an error: {e}")
+             return None
+        except httpx.TimeoutException as e:
+            logging.error(f"Ollama request timed out to {e.request.url}: {e}")
+            return None
+        except httpx.ConnectError as e:
+            logging.error(f"Ollama request connection error to {e.request.url}: {e}")
+            return None
+        except httpx.HTTPStatusError as e:
+            logging.error(f"Ollama request failed: Status {e.response.status_code} for {e.request.url} - Response: {e.response.text[:200]}...")
+            return None
+        except httpx.RequestError as e: # Catch other httpx request errors
+            logging.error(f"Ollama request failed: An ambiguous error occurred {e.request.url} - {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to decode JSON response from Ollama: {e}")
+            return None
+        except Exception as e: # Catch any other unexpected errors
+            logging.exception(f"An unexpected error occurred during LLM API call ({provider}): {e}") # Use logging.exception to include traceback
+            return None
+
+    # --- Method Modifications for using _call_llm_api ---
 
     async def generate_final_reflection(self) -> Dict:
         """生成最终的评估反思和结果报告"""
@@ -671,15 +800,15 @@ Format your response as:
                 
                 try:
                     # 尝试使用 gemini 模型
-                    completion = await self.client.chat.completions.create(
-                        model="gemini-2.0-flash-lite-preview-02-05", # 不要修改模型名称
+                    completion = await self._call_llm_api(
                         messages=[{"role": "system", "content": summary_prompt}],
                         temperature=0.3,
-                        max_tokens=200
+                        max_tokens=200,
+                        task_type="summary"
                     )
                     
-                    if completion.choices:
-                        reflection["summary"] = completion.choices[0].message.content
+                    if completion:
+                        reflection["summary"] = completion
                     else:
                         reflection["summary"] = "无法生成总结。"
                         
@@ -690,15 +819,15 @@ Format your response as:
                     
                     try:
                         # 尝试使用备用模型
-                        completion = await self.client.chat.completions.create(
-                            model="gemini-2.0-flash-lite-preview-02-05", # 备用模型
+                        completion = await self._call_llm_api(
                             messages=[{"role": "system", "content": summary_prompt}],
                             temperature=0.3,
-                            max_tokens=200
+                            max_tokens=200,
+                            task_type="summary"
                         )
                         
-                        if completion.choices:
-                            reflection["summary"] = completion.choices[0].message.content
+                        if completion:
+                            reflection["summary"] = completion
                         else:
                             reflection["summary"] = "无法生成总结。"
                     except Exception as backup_error:
@@ -720,3 +849,58 @@ Format your response as:
                 "scale_type": self.scale_type,
                 "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]]
             }
+
+    # --- New Method: Cleanup ---
+    async def close_clients(self):
+        """Close any open network clients."""
+        logging.info("Closing network clients...")
+        await self._http_client.aclose()
+        if self._openai_client_instance:
+            await self._openai_client_instance.aclose()
+            logging.info("Closed pre-initialized OpenAI client.")
+        logging.info("Network clients closed.")
+
+# Example usage (assuming you have a config dict and script path)
+# async def main():
+#     config = {
+#         "llm": {
+#             "provider": "ollama", # or "openai"
+#             "ollama": {
+#                 "base_url": "http://localhost:11434",
+#                 "model": "llama3",
+#                 "models": {
+#                     "decision": "llama3:instruct",
+#                     "natural_question": "llama3",
+#                     "summary": "llama3"
+#                 }
+#             },
+#             "openai": {
+#                 # "api_key": "YOUR_API_KEY", # Load securely
+#                 # "base_url": "OPTIONAL_BASE_URL",
+#                 "model": "gpt-3.5-turbo",
+#                 "models": {
+#                     "decision": "gpt-4-turbo-preview", # Example specific model
+#                     "natural_question": "gpt-3.5-turbo",
+#                     "summary": "gpt-3.5-turbo"
+#                 }
+#             }
+#         }
+#     }
+#     # Load API key securely, e.g., from environment variables
+#     import os
+#     config["llm"]["openai"]["api_key"] = os.getenv("OPENAI_API_KEY")
+
+#     agent = InterviewerAgent("path/to/your/script.json", config, scale_type="hamd")
+    
+#     # ... run interview loop ...
+#     # response = await agent.generate_next_action("Participant says something...")
+#     # print(response)
+
+#     # Finally, close clients
+#     await agent.close_clients()
+
+# if __name__ == "__main__":
+#     import asyncio
+#     # Configure logging here if running standalone
+#     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+#     # asyncio.run(main())

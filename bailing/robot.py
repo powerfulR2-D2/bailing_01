@@ -36,10 +36,9 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from bailing.interviewer.interview_logger import InterviewLogger
 from bailing.interviewer.question_generator import QuestionGenerator
 from dotenv import load_dotenv
-from openai import AsyncClient
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from typing import Optional
+from typing import Optional, Dict
 from bailing.interviewer.agent import InterviewerAgent
 import asyncio
 import socketio
@@ -98,9 +97,8 @@ def validate_questions(questions_str):
 
 
 class InterviewSession:
-    def __init__(self,openai_client):
-        self.openai_client = openai_client
-        
+    def __init__(self, llm_config: Dict):
+        self.llm_config = llm_config
 
         # 尝试读取文件内容
         """try:
@@ -110,7 +108,7 @@ class InterviewSession:
         except Exception as e:
             logger.error(f"读取文件时发生错误: {e}")"""
         self.agent = None
-        self.question_generator = QuestionGenerator(self.openai_client)
+        self.question_generator = QuestionGenerator(self.llm_config)
         
         self.logger = InterviewLogger()
 
@@ -131,10 +129,10 @@ class InterviewSession:
                 # 保存有效的问题到临时文件
                 temp_script_path = os.path.join(os.path.dirname(__file__), "interviewer/temp_script.json")
 
-                self.agent = InterviewerAgent(temp_script_path, self.openai_client)
+                self.agent = InterviewerAgent(temp_script_path, self.llm_config)
             else:
                 logging.info("Using default questions")
-                self.agent = InterviewerAgent(self.default_script_path, self.openai_client)
+                self.agent = InterviewerAgent(self.default_script_path, self.llm_config)
                 
             self.logger.start_new_session()
             return True
@@ -153,7 +151,16 @@ success = session.initialize_agent()
 
 class Robot(ABC):
     def __init__(self, config_file):
+        # Load the full configuration using the potentially new/unified function
+        # Assuming load_config returns the same structure as read_config for now
         config = read_config(config_file)
+        if not config:
+            logger.error("Failed to load configuration. Exiting.")
+            sys.exit(1) # Or raise an exception
+
+        # Keep the original read_config call if load_config is ONLY for LLM
+        # config_legacy = read_config(config_file)
+
         self.audio_queue = queue.Queue()
         self.current_task = None
         self.task_lock = threading.Lock()
@@ -181,12 +188,28 @@ class Robot(ABC):
             config["ASR"][config["selected_module"]["ASR"]]
         )
 
-        self.openai_client = AsyncClient(
-            api_key=config["LLM"][config["selected_module"]["LLM"]]["api_key"],
-            base_url=config["LLM"][config["selected_module"]["LLM"]]["url"],
-            timeout=120.0,
-            max_retries=5,
-        )
+        # Extract the specific LLM config needed by InterviewSession
+        # Assuming the structure is config -> LLM -> provider_name -> details
+        llm_configuration = config.get("llm") # Get the 'llm' sub-dictionary
+        if llm_configuration:
+            self.session = InterviewSession(llm_configuration) # Correct: Pass only LLM config
+            logger.info("InterviewSession initialized with LLM configuration.")
+        else:
+            logger.error("LLM configuration ('llm' key) not found in the loaded config. Cannot initialize InterviewSession.")
+            # Exit if LLM config is missing, as it's likely essential
+            sys.exit(1)
+
+        # Initialize the agent after session is created with correct config
+        # (Assuming self.patient_info is defined earlier or passed to __init__)
+        if hasattr(self, 'patient_info'): # Ensure patient_info exists before using it
+             success = asyncio.run(self.session.initialize_agent(self.patient_info))
+             if not success:
+                 logger.error("Failed to initialize InterviewSession's agent.")
+             else:
+                 logger.info("InterviewSession agent initialized successfully.")
+        else:
+             logger.warning("Patient info not available at agent initialization point.")
+
         self.tts = tts.create_instance(
             config["selected_module"]["TTS"],
             config["TTS"][config["selected_module"]["TTS"]]
@@ -224,18 +247,6 @@ class Robot(ABC):
         
         # 专门用于 TTS 的队列
         self.tts_queue = queue.Queue(maxsize=1)  # 限制队列大小为1
-        
-        # 初始化 InterviewSession
-        self.session = InterviewSession(self.openai_client)
-        logger.info("InterviewSession 初始化完成")
-        # 初始化 agent（传入患者信息）
-        success = asyncio.run(self.session.initialize_agent(self.patient_info))
-        
-        if not success:
-            logger.error("无法初始化 InterviewSession 的 agent")
-        logger.info("InterviewSession 初始化完成")
-
-
         
     def listen_dialogue(self, callback):
         self.callback = callback
@@ -292,9 +303,41 @@ class Robot(ABC):
         """关闭所有资源，确保程序安全退出"""
         logger.info("Shutting down Robot...")
         self.stop_event.set()
-        self.executor.shutdown(wait=True)
-        #self.recorder.stop_recording()
         
+        # Close InterviewAgent clients if agent exists
+        logger.info("Attempting to close agent clients...")
+        if hasattr(self.session, 'agent') and self.session.agent and hasattr(self.session.agent, 'close_clients'):
+            try:
+                # Running async function from sync context
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.run_until_complete(self.session.agent.close_clients())
+                except RuntimeError: # No running event loop
+                    asyncio.run(self.session.agent.close_clients())
+                logger.info("Agent clients closed successfully.")
+            except Exception as e:
+                logger.error(f"Error closing agent clients: {e}")
+        else:
+            logger.info("No agent or close_clients method found to close.")
+
+        # Close QuestionGenerator client if it exists and has the method
+        logger.info("Attempting to close question generator client...")
+        if hasattr(self.session, 'question_generator') and self.session.question_generator and hasattr(self.session.question_generator, 'close_client'):
+            try:
+                # Running async function from sync context
+                try:
+                    loop = asyncio.get_running_loop()
+                    loop.run_until_complete(self.session.question_generator.close_client())
+                except RuntimeError: # No running event loop
+                    asyncio.run(self.session.question_generator.close_client())
+                logger.info("Question generator client closed successfully.")
+            except Exception as e:
+                logger.error(f"Error closing question generator client: {e}")
+        else:
+            logger.info("No question generator or close_client method found to close.")
+
+        # Shutdown executor
+        self.executor.shutdown(wait=True)
         logger.info("Shutdown complete.")
 
     def start_recording_and_vad(self):
@@ -354,7 +397,7 @@ class Robot(ABC):
                         self.cancel_current_task()  # 直接调用取消方法
 
                 
-        sio.connect('https://localhost:5000')
+        sio.connect('https://localhost:5001')
         sio.wait()
 
     async def process_text(self, text):
@@ -480,7 +523,7 @@ class Robot(ABC):
         logger.info(f"初始问话：{initial_question}")
         # 发送开始录音信号
         try:
-                response = requests.post('https://localhost:5000/start_main_recording', verify=False)
+                response = requests.post('https://localhost:5001/start_main_recording', verify=False)
                 if response.status_code == 200:
                     logger.info("已发送开始录音信号")
                 else:
