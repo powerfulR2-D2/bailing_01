@@ -36,9 +36,10 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from bailing.interviewer.interview_logger import InterviewLogger
 from bailing.interviewer.question_generator import QuestionGenerator
 from dotenv import load_dotenv
+from openai import AsyncClient
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from typing import Optional, Dict
+from typing import Optional
 from bailing.interviewer.agent import InterviewerAgent
 import asyncio
 import socketio
@@ -97,8 +98,9 @@ def validate_questions(questions_str):
 
 
 class InterviewSession:
-    def __init__(self, llm_config: Dict):
-        self.llm_config = llm_config
+    def __init__(self,openai_client):
+        self.openai_client = openai_client
+        
 
         # 尝试读取文件内容
         """try:
@@ -108,7 +110,7 @@ class InterviewSession:
         except Exception as e:
             logger.error(f"读取文件时发生错误: {e}")"""
         self.agent = None
-        self.question_generator = QuestionGenerator(self.llm_config)
+        self.question_generator = QuestionGenerator(self.openai_client)
         
         self.logger = InterviewLogger()
 
@@ -129,15 +131,10 @@ class InterviewSession:
                 # 保存有效的问题到临时文件
                 temp_script_path = os.path.join(os.path.dirname(__file__), "interviewer/temp_script.json")
 
-                # Reconstruct the config structure expected by InterviewerAgent
-                agent_config = {"llm": self.llm_config}
-                self.agent = InterviewerAgent(temp_script_path, agent_config) # Pass reconstructed config
+                self.agent = InterviewerAgent(temp_script_path, self.openai_client)
             else:
                 logging.info("Using default questions")
-                # Assume default script path needs similar reconstruction if used
-                self.default_script_path = os.path.join(os.path.dirname(__file__), "interviewer/default_script.json") # Ensure default path exists or is handled
-                agent_config = {"llm": self.llm_config}
-                self.agent = InterviewerAgent(self.default_script_path, agent_config) # Pass reconstructed config
+                self.agent = InterviewerAgent(self.default_script_path, self.openai_client)
                 
             self.logger.start_new_session()
             return True
@@ -156,16 +153,7 @@ success = session.initialize_agent()
 
 class Robot(ABC):
     def __init__(self, config_file):
-        # Load the full configuration using the potentially new/unified function
-        # Assuming load_config returns the same structure as read_config for now
         config = read_config(config_file)
-        if not config:
-            logger.error("Failed to load configuration. Exiting.")
-            sys.exit(1) # Or raise an exception
-
-        # Keep the original read_config call if load_config is ONLY for LLM
-        # config_legacy = read_config(config_file)
-
         self.audio_queue = queue.Queue()
         self.current_task = None
         self.task_lock = threading.Lock()
@@ -193,28 +181,12 @@ class Robot(ABC):
             config["ASR"][config["selected_module"]["ASR"]]
         )
 
-        # Extract the specific LLM config needed by InterviewSession
-        # Assuming the structure is config -> LLM -> provider_name -> details
-        llm_configuration = config.get("llm") # Get the 'llm' sub-dictionary
-        if llm_configuration:
-            self.session = InterviewSession(llm_configuration) # Correct: Pass only LLM config
-            logger.info("InterviewSession initialized with LLM configuration.")
-        else:
-            logger.error("LLM configuration ('llm' key) not found in the loaded config. Cannot initialize InterviewSession.")
-            # Exit if LLM config is missing, as it's likely essential
-            sys.exit(1)
-
-        # Initialize the agent after session is created with correct config
-        # (Assuming self.patient_info is defined earlier or passed to __init__)
-        if hasattr(self, 'patient_info'): # Ensure patient_info exists before using it
-             success = asyncio.run(self.session.initialize_agent(self.patient_info))
-             if not success:
-                 logger.error("Failed to initialize InterviewSession's agent.")
-             else:
-                 logger.info("InterviewSession agent initialized successfully.")
-        else:
-             logger.warning("Patient info not available at agent initialization point.")
-
+        self.openai_client = AsyncClient(
+            api_key=config["LLM"][config["selected_module"]["LLM"]]["api_key"],
+            base_url=config["LLM"][config["selected_module"]["LLM"]]["url"],
+            timeout=120.0,
+            max_retries=5,
+        )
         self.tts = tts.create_instance(
             config["selected_module"]["TTS"],
             config["TTS"][config["selected_module"]["TTS"]]
@@ -252,6 +224,18 @@ class Robot(ABC):
         
         # 专门用于 TTS 的队列
         self.tts_queue = queue.Queue(maxsize=1)  # 限制队列大小为1
+        
+        # 初始化 InterviewSession
+        self.session = InterviewSession(self.openai_client)
+        logger.info("InterviewSession 初始化完成")
+        # 初始化 agent（传入患者信息）
+        success = asyncio.run(self.session.initialize_agent(self.patient_info))
+        
+        if not success:
+            logger.error("无法初始化 InterviewSession 的 agent")
+        logger.info("InterviewSession 初始化完成")
+
+
         
     def listen_dialogue(self, callback):
         self.callback = callback
@@ -308,41 +292,9 @@ class Robot(ABC):
         """关闭所有资源，确保程序安全退出"""
         logger.info("Shutting down Robot...")
         self.stop_event.set()
-        
-        # Close InterviewAgent clients if agent exists
-        logger.info("Attempting to close agent clients...")
-        if hasattr(self.session, 'agent') and self.session.agent and hasattr(self.session.agent, 'close_clients'):
-            try:
-                # Running async function from sync context
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.run_until_complete(self.session.agent.close_clients())
-                except RuntimeError: # No running event loop
-                    asyncio.run(self.session.agent.close_clients())
-                logger.info("Agent clients closed successfully.")
-            except Exception as e:
-                logger.error(f"Error closing agent clients: {e}")
-        else:
-            logger.info("No agent or close_clients method found to close.")
-
-        # Close QuestionGenerator client if it exists and has the method
-        logger.info("Attempting to close question generator client...")
-        if hasattr(self.session, 'question_generator') and self.session.question_generator and hasattr(self.session.question_generator, 'close_client'):
-            try:
-                # Running async function from sync context
-                try:
-                    loop = asyncio.get_running_loop()
-                    loop.run_until_complete(self.session.question_generator.close_client())
-                except RuntimeError: # No running event loop
-                    asyncio.run(self.session.question_generator.close_client())
-                logger.info("Question generator client closed successfully.")
-            except Exception as e:
-                logger.error(f"Error closing question generator client: {e}")
-        else:
-            logger.info("No question generator or close_client method found to close.")
-
-        # Shutdown executor
         self.executor.shutdown(wait=True)
+        #self.recorder.stop_recording()
+        
         logger.info("Shutdown complete.")
 
     def start_recording_and_vad(self):
@@ -402,7 +354,7 @@ class Robot(ABC):
                         self.cancel_current_task()  # 直接调用取消方法
 
                 
-        sio.connect('https://localhost:5001')
+        sio.connect('https://localhost:5000')
         sio.wait()
 
     async def process_text(self, text):
@@ -421,58 +373,36 @@ class Robot(ABC):
     async def handle_response(self, response_message):
         """处理响应消息的异步方法"""
         try:
-            # --- MODIFIED Error Handling ---
-            if not response_message or not isinstance(response_message, dict):
-                logger.error(f"Invalid response_message received by handle_response: {response_message}")
-                return # Do nothing if the message structure is wrong
-
-            # Check if chat_tool indicated an internal error
-            if response_message.get("internal_error"):
-                error_msg = response_message.get("error_message", "Unknown internal error")
-                logger.error(f"Internal error detected in handle_response: {error_msg}")
-                # DO NOT send this internal error to the user or TTS. Just log it.
-                # Optionally, you could send a *very generic*, non-specific message like:
-                # if self.callback:
-                #     self.callback({"role": "assistant", "content": "抱歉，我暂时无法回应。", "need_confirm": False})
-                return # Stop processing this message further
-            # --- END MODIFIED Error Handling ---
-
-            # --- Original logic for VALID responses ---
             if self.callback:
-                # Send text content via callback
-                text_content = response_message.get('response', '')
                 self.callback({
-                    "role": "assistant",
-                    "content": text_content,
-                    "need_confirm": response_message.get('need_confirm', False) # Pass confirm flag
+                    "role": "assistant", 
+                    "content": response_message['response'],
+                    "need_confirm": response_message['need_confirm']
                 })
+                
+                # 提交新的语音合成任务
+                future = self.executor.submit(self.speak_and_play, response_message['response'])
+                
+                try:
+                    old_future = self.tts_queue.get_nowait()
+                    old_future.cancel()
+                except queue.Empty:
+                    pass
+                
+                try:
+                    self.tts_queue.put_nowait(future)
+                except queue.Full:
+                    logger.error("TTS队列已满")
 
-                # Submit for TTS only if there is text content
-                if text_content:
-                    future = self.executor.submit(self.speak_and_play, text_content)
-                    # TTS Queue logic (same as before)
-                    try:
-                        old_future = self.tts_queue.get_nowait()
-                        old_future.cancel()
-                    except queue.Empty:
-                        pass
-                    try:
-                        self.tts_queue.put_nowait(future)
-                    except queue.Full:
-                        logger.error("TTS队列已满")
-
-            # Handle image types (same as before)
-            response_type = response_message.get('type', 'text') # Default to text
-            if response_type in ['image', 'draw']:
-                image_path = response_message.get('content', response_message.get('image_path', '')) # Check both keys
-                if image_path and self.callback:
+            if response_message.get('type') in ['image', 'draw']:
+                if self.callback:
                     self.callback({
                         "role": "assistant",
-                        "type": response_type,
-                        "content": image_path
+                        "type": response_message.get('type'),
+                        "content": response_message['image_path']
                     })
         except Exception as e:
-            logger.exception(f"处理响应时出错: {e}") # Use exception for traceback
+            logger.error(f"处理响应时出错: {e}")
 
     def _duplex(self):
         """后台处理语音流的线程函数"""
@@ -550,7 +480,7 @@ class Robot(ABC):
         logger.info(f"初始问话：{initial_question}")
         # 发送开始录音信号
         try:
-                response = requests.post('https://localhost:5001/start_main_recording', verify=False)
+                response = requests.post('https://localhost:5000/start_main_recording', verify=False)
                 if response.status_code == 200:
                     logger.info("已发送开始录音信号")
                 else:
@@ -625,60 +555,72 @@ class Robot(ABC):
 
     async def chat_tool(self, query):
         try:
-            # ... (check agent) ...
+            # 记录开始时间
+            start_time = time.time()
+            # 检查 agent 是否存在
+            if self.session.agent is None:
+                logger.error("Interview agent 未初始化")
+                return {"response": "抱歉，系统出现了问题，无法生成回复。"}
+            
             logger.info(f"开始处理查询: {query}")
+            
+            # 使用异步锁保护关键部分
             async with self.async_lock:
+                # 创建一个任务
                 self.current_task = asyncio.create_task(self.session.agent.generate_next_action(query))
+                
                 try:
-                    llm_responses = await asyncio.wait_for(self.current_task, timeout=60.0) # Increased timeout slightly
+                    # 等待任务完成，设置超时时间
+                    llm_responses = await asyncio.wait_for(self.current_task, timeout=30.0)  # 30秒超时
                     logger.info(f"LLM 原始响应: {llm_responses}")
-
-                    # --- Important: Check agent response format EARLY ---
-                    if not isinstance(llm_responses, dict):
-                         logger.error(f"Agent response format error, expected dict, got {type(llm_responses)}")
-                         # Return internal error structure
-                         return {"internal_error": True, "error_message": "Agent response format error"}
-
-                    # Check if the agent itself reported an error
-                    if llm_responses.get('action') == 'error' or 'error' in llm_responses:
-                         error_msg = llm_responses.get('error', 'Agent reported an unknown error')
-                         logger.error(f"Agent returned an error: {error_msg}")
-                         # Return internal error structure
-                         return {"internal_error": True, "error_message": f"Agent error: {error_msg}"}
-
-                    # --- Process valid agent response ---
-                    # (Original processing logic for normal/image responses)
-                    content = llm_responses.get('response')
-                    if not content and llm_responses.get('type') not in ['image', 'draw']: # Check content unless it's an image
-                         logger.error(f"Agent response content is empty: {llm_responses}")
-                         return {"internal_error": True, "error_message": "Agent response content empty"}
-
-                    logger.info(f"最终响应内容: {content}")
-                    # Return the valid agent response directly
-                    return llm_responses # Pass the original structure through
-
                 except asyncio.TimeoutError:
-                    logger.error("LLM 响应超时 (wait_for)")
-                    if self.current_task and not self.current_task.done(): self.current_task.cancel()
-                    # Return internal error structure, NO user-facing "response"
-                    return {"internal_error": True, "error_message": "LLM response timeout"}
+                    logger.error("LLM 响应超时")
+                    if not self.current_task.done():
+                        self.current_task.cancel()
+                    return {"response": "抱歉，响应时间过长，请稍后重试。"}
                 except asyncio.CancelledError:
-                    logger.info("Agent task被取消")
-                    # Return internal error structure
-                    return {"internal_error": True, "error_message": "Task cancelled"}
+                    logger.info("任务被取消")
+                    return {"response": "任务已被系统取消"}
                 except Exception as e:
-                    logger.error(f"LLM 调用或Agent处理失败: {str(e)}", exc_info=True)
-                    if self.current_task and not self.current_task.done(): self.current_task.cancel()
-                    # Return internal error structure
-                    return {"internal_error": True, "error_message": f"LLM/Agent call failed: {str(e)}"}
+                    logger.error(f"LLM 调用失败: {str(e)}", exc_info=True)
+                    if not self.current_task.done():
+                        self.current_task.cancel()
+                    return {"response": "抱歉，系统暂时无法处理您的请求。"}
                 finally:
                     self.current_task = None
-
+            
+            # 记录响应生成时间
+            end_time = time.time()
+            logger.info(f"响应时间: {end_time - start_time:.2f} 秒")
+            
+            # 验证和处理响应
+            if not isinstance(llm_responses, dict):
+                logger.error(f"响应格式错误，期望 dict 类型，实际类型: {type(llm_responses)}")
+                return {"response": "抱歉，系统返回格式错误。"}
+            
+            # 处理特殊类型响应
+            if llm_responses.get('type') in ['image', 'draw']:
+                logger.info("处理图片类型响应")
+                return llm_responses
+            
+            # 获取响应内容
+            content = llm_responses.get('response')
+            if not content:
+                logger.error(f"响应内容为空: {llm_responses}")
+                return {"response": "抱歉，系统返回内容为空。"}
+            
+            logger.info(f"最终响应内容: {content}")
+            return {
+                "response": content,
+                "need_confirm": llm_responses.get('need_confirm'),
+                "type": llm_responses.get('type', 'text')
+            }
+            
         except Exception as e:
-            # Catch errors in chat_tool setup itself
-            logger.exception(f"处理查询时发生意外错误: {query}")
-            return {"internal_error": True, "error_message": f"Error in chat_tool: {str(e)}"}
-
+            import traceback
+            error_stack = traceback.format_exc()
+            logger.error(f"处理查询时发生错误: {query}\n错误类型: {type(e).__name__}\n错误信息: {str(e)}\n堆栈跟踪:\n{error_stack}")
+            return {"response": "抱歉，系统处理出现错误，请稍后重试。"}
 
     async def chat(self, query):
         logger.debug("开始处理聊天消息")

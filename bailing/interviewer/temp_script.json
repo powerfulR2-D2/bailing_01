@@ -2,12 +2,12 @@
   "questions": [
     {
       "id": "greeting",
-      "question": "您好，张先生，很高兴今天能和您聊聊。根据您提供的信息，我了解到一些您的基本情况。为了更好地了解您的情绪和整体状态，接下来我会问您一些问题，这些问题都是想更深入地了解您最近一周左右的感受，请您轻松地告诉我您的想法就可以了，不用有压力，我也会认真倾听，可以吗？",
+      "question": "您好，张先生，很高兴今天能和您聊聊。根据您提供的信息，我了解到您的一些情况。为了更好地了解您的情绪和整体状态，接下来我会问您一些问题，这些问题都是想更深入地了解您最近一周左右的感受，请您轻松地告诉我您的想法就可以了，不用有压力，我也会认真倾听，可以吗？",
       "type": "instruction"
     },
     {
       "id": "emotional_state",
-      "question": "张先生，最近一段时间，您整体感觉如何？有没有觉得心情比较低落，或者对什么事情提不起兴趣？",
+      "question": "最近一段时间，您感觉自己的情绪怎么样？有没有觉得特别低落、沮丧，或者对什么事情都提不起兴趣？",
       "type": "open_ended",
       "expected_topics": [
         "depressed_mood",
@@ -15,133 +15,130 @@
       ],
       "follow_up_questions": [
         "能具体说说是什么让您感到低落吗？",
-        "您提到对什么事情提不起兴趣，能举个例子吗？",
-        "这种感觉持续了多久了？"
+        "您觉得这种低落感持续了多久？",
+        "有没有什么事情能稍微缓解您的情绪？"
       ]
     },
     {
       "id": "guilt_feelings",
-      "question": "有时候我们可能会因为一些事情感到内疚或自责，您最近有没有遇到让您觉得特别后悔或自责的事情？",
+      "question": "最近有没有觉得特别自责或者内疚？哪怕是一些小事，也觉得是自己的错？",
       "type": "open_ended",
       "expected_topics": [
         "guilt_feelings"
       ],
       "follow_up_questions": [
-        "能详细说说您觉得内疚的事情吗？",
+        "能具体说说您觉得内疚的事情是什么吗？",
         "这种内疚感对您有什么影响？",
-        "您觉得这种内疚感是合理的吗？"
+        "您觉得这种感觉是合理的吗？"
       ]
     },
     {
       "id": "suicidal_thoughts",
-      "question": "张先生，有时候生活可能会遇到一些困难，让人感到很无助。请问您最近有没有过一些不好的念头，比如觉得人生没有意义，或者希望自己消失？（请您放心，我会认真倾听，并提供必要的帮助。）",
+      "question": "有时候，生活可能会让人感到很艰难。您最近有没有过一些不好的想法，或者觉得人生没有希望？",
       "type": "open_ended",
       "expected_topics": [
         "suicidal_ideation"
       ],
       "follow_up_questions": [
-        "如果可以，能详细说说您当时的想法吗？",
-        "您有没有想过采取什么行动？",
-        "您觉得有什么事情可以帮助您度过这段困难时期？"
+        "如果可以的话，能详细说说您的想法吗？",
+        "您有没有想过要伤害自己？",
+        "您有没有觉得有人可以帮助您？"
       ]
     },
     {
       "id": "sleep_disturbances",
-      "question": "张先生，您最近的睡眠怎么样？有没有觉得入睡困难、容易醒来、或者早上醒得特别早？",
+      "question": "最近一段时间，您的睡眠怎么样？有没有觉得入睡困难、容易醒来、或者早上醒得特别早？",
       "type": "open_ended",
       "expected_topics": [
         "insomnia",
-        "sleep_maintenance_difficulty",
-        "early_morning_awakening"
+        "early_morning_awakening",
+        "sleep_quality"
       ],
       "follow_up_questions": [
-        "您一般几点睡觉？",
-        "您觉得是什么原因导致您睡眠不好？",
-        "您早上几点醒来，醒来后感觉怎么样？"
+        "您通常需要多长时间才能入睡？",
+        "您晚上醒来几次？",
+        "您觉得睡眠质量怎么样？"
       ]
     },
     {
-      "id": "work_interest",
-      "question": "张先生，您平时有什么工作或学习，或者感兴趣的事情吗？最近有没有觉得对这些事情提不起兴趣，或者觉得很吃力？",
+      "id": "work_and_interests",
+      "question": "最近您对工作、学习或者平时感兴趣的事情，感觉怎么样？有没有觉得提不起兴趣，或者觉得很吃力？",
       "type": "open_ended",
       "expected_topics": [
         "loss_of_interest",
         "difficulty_concentrating"
       ],
       "follow_up_questions": [
-        "您平时喜欢做什么？",
-        "您觉得是什么原因导致您对这些事情提不起兴趣？",
-        "您觉得您现在的工作或学习状态怎么样？"
+        "以前您喜欢做些什么？",
+        "现在您还有精力去做这些事情吗？",
+        "您觉得是什么原因导致您对这些事情失去兴趣？"
       ]
     },
     {
-      "id": "fatigue_energy",
-      "question": "张先生，您最近有没有觉得特别容易疲劳，或者总是觉得没有力气？",
+      "id": "psychomotor_retardation",
+      "question": "您有没有觉得自己的反应变得迟钝，或者行动起来比较慢？",
       "type": "open_ended",
       "expected_topics": [
-        "fatigue",
-        "loss_of_energy"
+        "psychomotor_retardation"
       ],
       "follow_up_questions": [
-        "您觉得这种疲劳感是什么时候开始的？",
-        "您觉得是什么原因导致您感到疲劳？",
-        "这种疲劳感对您的生活有什么影响？"
+        "您觉得自己的思维速度有没有变慢？",
+        "您有没有觉得自己的身体很笨重？",
+        "这种迟钝感对您的日常生活有什么影响？"
       ]
     },
     {
-      "id": "appetite_weight",
-      "question": "张先生，您最近的食欲怎么样？有没有觉得食欲不振，或者总是想吃东西？体重有没有发生明显的变化？",
+      "id": "agitation",
+      "question": "您有没有觉得特别烦躁不安，或者坐立不安？",
+      "type": "open_ended",
+      "expected_topics": [
+        "agitation"
+      ],
+      "follow_up_questions": [
+        "您觉得是什么原因让您感到烦躁？",
+        "您通常通过什么方式来缓解这种烦躁？",
+        "这种烦躁感对您的日常生活有什么影响？"
+      ]
+    },
+    {
+      "id": "physical_symptoms",
+      "question": "最近您有没有感到身体不舒服，比如食欲不振、体重下降、或者感到疲劳？",
       "type": "open_ended",
       "expected_topics": [
         "appetite_changes",
         "weight_loss",
-        "weight_gain"
+        "fatigue"
       ],
       "follow_up_questions": [
-        "您最近一般吃什么？",
-        "您觉得您的食欲变化是什么原因导致的？",
-        "您最近有没有刻意控制饮食？"
+        "您的食欲有没有发生明显变化？",
+        "您最近体重有没有下降？",
+        "您每天都感到疲劳吗？"
       ]
     },
     {
-      "id": "concentration_thinking",
-      "question": "张先生，您最近有没有觉得注意力不集中，或者总是觉得思绪混乱？",
+      "id": "concentration_difficulties",
+      "question": "您有没有觉得注意力难以集中，或者容易分心？",
       "type": "open_ended",
       "expected_topics": [
-        "difficulty_concentrating",
-        "cognitive_difficulties"
+        "difficulty_concentrating"
       ],
       "follow_up_questions": [
-        "您觉得是什么原因导致您注意力不集中？",
-        "您觉得这种注意力不集中对您的生活有什么影响？",
-        "您最近有没有觉得记忆力下降？"
+        "您觉得是什么原因导致您注意力难以集中？",
+        "您在工作或者学习的时候，能集中注意力多久？",
+        "这种注意力难以集中对您的日常生活有什么影响？"
       ]
     },
     {
-      "id": "psychomotor_agitation",
-      "question": "张先生，您最近有没有觉得身体不舒服，比如总是坐立不安，或者感觉手脚发麻？",
+      "id": "self_worth",
+      "question": "您觉得自己是一个有价值的人吗？最近有没有觉得自己很糟糕，或者对未来感到绝望？",
       "type": "open_ended",
       "expected_topics": [
-        "psychomotor_agitation",
-        "psychomotor_retardation"
+        "feelings_of_worthlessness"
       ],
       "follow_up_questions": [
-        "您觉得这种不舒服是什么时候开始的？",
-        "您觉得是什么原因导致您感到不舒服？",
-        "这种不舒服对您的生活有什么影响？"
-      ]
-    },
-    {
-      "id": "social_withdrawal",
-      "question": "张先生，您最近有没有觉得不想和别人交流，或者总是想独自一人？",
-      "type": "open_ended",
-      "expected_topics": [
-        "social_withdrawal"
-      ],
-      "follow_up_questions": [
-        "您觉得是什么原因导致您不想和别人交流？",
-        "您觉得您现在的人际关系怎么样？",
-        "您最近有没有参加社交活动？"
+        "您觉得是什么让您觉得自己很糟糕？",
+        "您对未来有什么样的期望？",
+        "您觉得有什么可以帮助您重新找回自信？"
       ]
     }
   ]

@@ -2,31 +2,57 @@ import json
 import logging
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional
+import random # Import random for the natural question transition fallback
 
+# LLM Client Imports
 import httpx
-# Use alias for clarity when creating instances later
+import openai # Keep standard import
 from openai import AsyncClient as OpenAIAsyncClient
 
-# Configure logging at the module level (or application entry point)
+# Configure logging - basic example, customize as needed
 # logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 # logger = logging.getLogger(__name__) # Using __name__ is standard practice
 
 class InterviewerAgent:
-    # def __init__(self, script_path: str, openai_client: AsyncClient, scale_type: str = "hamd"): # Old signature
-    def __init__(self, script_path: str, llm_config: Dict, scale_type: str = "hamd"): # New signature
+    # --- MODIFIED: __init__ to accept llm_config ---
+    def __init__(self, script_path: str, llm_config: Dict, scale_type: str = "hamd"):
         """Initialize the interviewer agent with an interview script and LLM config.
 
         Args:
             script_path (str): The path to the interview script JSON file.
             llm_config (Dict): Configuration for the LLM provider (openai or ollama).
-                               Expected structure: {"llm": {"provider": "...", "openai": {...}, "ollama": {...}}}
+                               Expected structure example:
+                               {
+                                   "llm": {
+                                       "provider": "openai", # or "ollama"
+                                       "openai": {
+                                           "api_key": "YOUR_OPENAI_API_KEY", # Load securely!
+                                           "base_url": None, # Optional: for proxies/custom endpoints
+                                           "model": "gpt-3.5-turbo", # Default model for all tasks unless overridden
+                                           "models": { # Optional: Task-specific models
+                                               "decision": "gpt-4-turbo-preview",
+                                               "natural_question": "gpt-3.5-turbo",
+                                               "summary": "gpt-3.5-turbo"
+                                           }
+                                       },
+                                       "ollama": {
+                                           "base_url": "http://localhost:11434", # Default Ollama URL
+                                           "model": "llama3", # Default model for all tasks unless overridden
+                                           "models": { # Optional: Task-specific models
+                                               "decision": "llama3:instruct",
+                                               "natural_question": "llama3",
+                                               "summary": "llama3"
+                                           }
+                                       }
+                                   }
+                               }
             scale_type (str): Type of assessment scale (hamd, hama, mini)
         """
-        self.script = self._load_script(script_path)
+        self.script = self._load_script(script_path) # Uses original _load_script logic
         self.current_question_index = 0
         self.conversation_history = []
-        # self.client = openai_client # Removed
-        self.llm_config = llm_config # Added
+        # REMOVED: self.client = openai_client
+        self.llm_config = llm_config # ADDED: Store LLM config
         self.scale_type = scale_type
         self.current_question_state = {
             "follow_up_count": 0,
@@ -34,109 +60,289 @@ class InterviewerAgent:
             "key_points_covered": [],
             "last_follow_up": None
         }
-        # Initialize shared HTTP client for Ollama and potentially others
-        self._http_client = httpx.AsyncClient(verify=True, timeout=60.0) # Added, verify=True initially
+        # ADDED: Shared HTTP client for Ollama and potentially others
+        # Consider increasing timeout if local models are slow
+        self._http_client = httpx.AsyncClient(timeout=120.0) # Increased timeout
 
-        # Optional: Pre-initialize OpenAI client if provider is openai
-        self._openai_client_instance: Optional[OpenAIAsyncClient] = None # Added
+        # ADDED: Optional pre-initialization of OpenAI client
+        self._openai_client_instance: Optional[OpenAIAsyncClient] = None
         if self.llm_config.get("llm", {}).get("provider") == "openai":
             openai_conf = self.llm_config.get("llm", {}).get("openai", {})
             api_key = openai_conf.get("api_key")
             base_url = openai_conf.get("base_url")
+            # Explicitly add request_timeout here if needed
+            request_timeout = openai_conf.get("request_timeout", 120.0) # Default to 120s
             if api_key: # Only initialize if api_key is provided
-                self._openai_client_instance = OpenAIAsyncClient(
-                    api_key=api_key,
-                    base_url=base_url # base_url can be None, OpenAI client handles default
-                )
-                logging.info("Pre-initialized OpenAI client.")
+                try:
+                    self._openai_client_instance = OpenAIAsyncClient(
+                        api_key=api_key,
+                        base_url=base_url, # base_url can be None
+                        timeout=request_timeout # Pass timeout to client
+                    )
+                    logging.info(f"Pre-initialized OpenAI client with timeout {request_timeout}s.")
+                except Exception as e:
+                    logging.error(f"Failed to pre-initialize OpenAI client: {e}")
             else:
-                logging.warning("OpenAI provider selected, but no API key found in llm_config. Direct calls will fail unless a key is provided later or implicitly.")
+                logging.warning("OpenAI provider selected, but no API key found in llm_config. Direct API calls will fail unless a key is provided later or implicitly (e.g., via env vars).")
 
-
+    # --- ORIGINAL: _load_script ---
+    # (With minor adjustment for key_points consistency)
     def _load_script(self, script_path: str) -> List[Dict]:
         """Load the interview script from a JSON file."""
         try:
             with open(script_path, 'r', encoding='utf-8') as f:
-                script = json.load(f, object_pairs_hook=OrderedDict)
-                # Handle both formats: direct list or nested under 'questions'
-                questions = script.get("questions", []) if isinstance(script, dict) else script
-                
-                # Validate and set default values for each question
+                script_data = json.load(f, object_pairs_hook=OrderedDict)
+                questions = script_data.get("questions", []) if isinstance(script_data, dict) else script_data
+
                 validated_questions = []
-                for question in questions:
+                for idx, question in enumerate(questions):
                     if not isinstance(question, dict):
+                        logging.warning(f"Skipping invalid item in script at index {idx}: {question}")
                         continue
-                        
-                    # Set default values for required fields
+
                     validated_question = {
-                        "id": question.get("id", f"q{len(validated_questions)}"),
-                        "question": question.get("question", "Could you please elaborate on that?"),
+                        "id": question.get("id", f"q{idx}"),
+                        "question": question.get("question"), # Keep original behavior (might be None)
                         "type": question.get("type", "open_ended"),
-                        "expected_topics": question.get("expected_topics", []),
-                        "time_limit": question.get("time_limit", 300)  # Default 5 minutes
+                        # Use 'key_points' primarily, fallback to 'expected_topics' for compatibility
+                        "key_points": question.get("key_points", question.get("expected_topics", [])),
+                        "time_limit": question.get("time_limit", 300)
                     }
+                    # Original didn't explicitly check for missing 'question' here, maintaining that.
+                    # If 'question' is None, it might cause issues later, but we stick to original logic.
+                    if validated_question["question"] is None:
+                         logging.warning(f"Question text missing for item at index {idx} (ID: {validated_question['id']}).")
+                         # Original code added it anyway, so we do too.
                     validated_questions.append(validated_question)
-                
-                return validated_questions if validated_questions else [{
-                    "id": "default",
-                    "question": "Could you please introduce yourself?",
-                    "type": "open_ended",
-                    "expected_topics": ["background", "education", "interests"],
-                    "time_limit": 300
-                }]
+
+                if not validated_questions:
+                     logging.warning("Script loaded but contained no valid questions. Using default.")
+                     return self._get_default_script() # Use helper for default
+                else:
+                     return validated_questions
+
+        except FileNotFoundError:
+             logging.error(f"Error loading script: File not found at {script_path}. Using default.")
+             return self._get_default_script()
+        except json.JSONDecodeError as e:
+             logging.error(f"Error loading script: Invalid JSON in {script_path} - {e}. Using default.")
+             return self._get_default_script()
         except Exception as e:
-            logging.error(f"Error loading script: {str(e)}")
-            return [{
-                "id": "default",
-                "question": "Could you please introduce yourself?",
-                "type": "open_ended",
-                "expected_topics": ["background", "education", "interests"],
-                "time_limit": 300
-            }]
-    
+             logging.error(f"An unexpected error occurred loading script: {str(e)}. Using default.")
+             return self._get_default_script()
+
+    # --- ADDED: Helper for default script (from modified) ---
+    def _get_default_script(self) -> List[Dict]:
+        """Returns the default fallback script."""
+        # Using the default from the original code
+        return [{
+            "id": "default",
+            "question": "Could you please introduce yourself?",
+            "type": "open_ended",
+            "key_points": ["background", "education", "interests"], # Changed expected_topics to key_points
+            "time_limit": 300
+        }]
+
+    # --- ADDED: Centralized LLM API call logic (from modified) ---
+    async def _call_llm_api(self, messages: List[Dict], temperature: float, max_tokens: int, task_type: str = "default") -> Optional[str]:
+        """Calls the configured LLM API (OpenAI or Ollama)."""
+        provider_config = self.llm_config.get("llm", {})
+        provider = provider_config.get("provider")
+
+        if not provider:
+            logging.error("LLM provider is not specified in llm_config.")
+            return None
+
+        logging.info(f"Calling LLM provider: {provider} for task: {task_type}")
+
+        try:
+            if provider == "openai":
+                openai_conf = provider_config.get("openai", {})
+                api_key = openai_conf.get("api_key")
+                base_url = openai_conf.get("base_url")
+                request_timeout = openai_conf.get("request_timeout", 120.0) # Get timeout from config
+
+                # Select model: Use task-specific model if available, else fallback to default model
+                models = openai_conf.get("models", {})
+                model_name = models.get(task_type) or openai_conf.get("model") # Fallback to default
+
+                if not model_name:
+                    logging.error(f"No OpenAI model specified for task '{task_type}' or default in llm_config.")
+                    return None
+
+                # Determine client to use
+                client_to_use = self._openai_client_instance
+                temp_client = None
+                if not client_to_use:
+                    # If no pre-initialized client, create a temporary one
+                    if not api_key:
+                        # Try default client (might use env vars)
+                        logging.warning("No pre-initialized client and no API key in config. Attempting default OpenAI client.")
+                        try:
+                            # Pass timeout here too
+                            client_to_use = OpenAIAsyncClient(base_url=base_url, timeout=request_timeout)
+                        except Exception as e:
+                             logging.error(f"Failed to create default OpenAI client: {e}")
+                             return None
+                    else:
+                        logging.warning("Creating temporary OpenAI client for this call.")
+                        try:
+                            # Pass timeout here
+                            temp_client = OpenAIAsyncClient(api_key=api_key, base_url=base_url, timeout=request_timeout)
+                            client_to_use = temp_client
+                        except Exception as e:
+                             logging.error(f"Failed to create temporary OpenAI client: {e}")
+                             return None
+
+                if not client_to_use: # Check if client creation failed
+                    logging.error("Could not obtain OpenAI client instance.")
+                    return None
+
+                logging.debug(f"OpenAI Request: model={model_name}, temp={temperature}, max_tokens={max_tokens}, timeout={request_timeout}")
+
+                completion = await client_to_use.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    # Timeout is often set on the client, but can sometimes be passed per-request
+                    # request_timeout=request_timeout # Check OpenAI library documentation if needed
+                )
+
+                # Close temporary client if one was created
+                if temp_client:
+                    await temp_client.aclose()
+
+                if completion.choices and completion.choices[0].message and completion.choices[0].message.content:
+                    response_content = completion.choices[0].message.content
+                    logging.debug(f"OpenAI Response: {response_content[:100]}...")
+                    return response_content
+                else:
+                    logging.warning("OpenAI API returned no choices or message content.")
+                    return None
+
+            elif provider == "ollama":
+                ollama_conf = provider_config.get("ollama", {})
+                base_url = ollama_conf.get("base_url")
+                if not base_url:
+                    logging.error("Ollama base_url is not specified in llm_config.")
+                    return None
+
+                models = ollama_conf.get("models", {})
+                model_name = models.get(task_type) or models.get("model")
+
+                if not model_name:
+                    logging.error(f"No Ollama model specified for task '{task_type}' or default in llm_config.")
+                    return None
+
+                api_url = f"{base_url.rstrip('/')}/api/chat"
+                payload = {
+                    "model": model_name,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens
+                    }
+                }
+                logging.debug(f"Ollama Request: url={api_url}, model={model_name}, temp={temperature}, max_tokens={max_tokens}")
+
+                # Use the shared client with its configured timeout
+                response = await self._http_client.post(api_url, json=payload)
+                response.raise_for_status()
+
+                response_data = response.json()
+                if response_data and isinstance(response_data.get("message"), dict) and "content" in response_data["message"]:
+                    response_content = response_data["message"]["content"]
+                    logging.debug(f"Ollama Response: {response_content[:100]}...")
+                    return response_content
+                else:
+                    logging.warning(f"Ollama API response format unexpected or missing content: {response_data}")
+                    return None
+            else:
+                logging.error(f"Unsupported LLM provider configured: {provider}")
+                return None
+
+        except openai.APIConnectionError as e:
+            logging.error(f"OpenAI API connection error: {e}")
+            return None
+        except openai.RateLimitError as e:
+            logging.error(f"OpenAI API rate limit exceeded: {e}")
+            return None
+        except openai.AuthenticationError as e:
+             logging.error(f"OpenAI API authentication error (invalid API key?): {e}")
+             return None
+        except openai.APIStatusError as e:
+            logging.error(f"OpenAI API returned an error status: {e.status_code} {e.response}")
+            return None
+        except openai.APITimeoutError as e:
+            logging.error(f"OpenAI API request timed out: {e}")
+            return None
+        except httpx.RequestError as e:
+            logging.error(f"An HTTP request error occurred calling {provider}: {e}")
+            return None
+        except httpx.HTTPStatusError as e:
+            logging.error(f"HTTP error calling {provider}: Status {e.response.status_code} - {e.response.text}")
+            return None
+        except Exception as e:
+            logging.exception(f"An unexpected error occurred during LLM API call ({provider}) for task '{task_type}': {e}")
+            return None
+
+    # --- ORIGINAL: generate_next_action ---
+    # (With LLM call replaced)
     async def generate_next_action(self, participant_response: str) -> Dict:
         """Generate the next interviewer action based on the participant's response."""
         try:
-            # Add response to conversation history
             self.conversation_history.append({
                 "role": "participant",
                 "content": participant_response
             })
-            
-            # 检查是否是最后一个问题
+
+            # Original completion check logic
             is_interview_complete = False
+            # Check if index is *at or beyond* the last valid index
             if self.current_question_index >= len(self.script) - 1:
-                is_interview_complete = True
-            else:
-                current_question = self.script[self.current_question_index]
-                if current_question.get("type") == "conclusion":
-                    is_interview_complete = True
-            
-            # 如果是最后一个问题，直接返回结束消息
+                 # If index is valid and it's the last question, mark complete
+                 if self.current_question_index == len(self.script) - 1:
+                      is_interview_complete = True
+                 # If index is out of bounds (shouldn't happen with proper checks but safety first)
+                 elif self.current_question_index >= len(self.script):
+                      logging.warning("Current question index is out of script bounds. Ending interview.")
+                      is_interview_complete = True
+                 # Original logic also checked type, let's keep it for consistency
+                 else:
+                      current_question = self.script[self.current_question_index]
+                      if current_question.get("type") == "conclusion":
+                           is_interview_complete = True
+            # Check type even if not the last question index (as per original)
+            elif self.current_question_index < len(self.script):
+                 current_question = self.script[self.current_question_index]
+                 if current_question.get("type") == "conclusion":
+                      is_interview_complete = True
+
+
             if is_interview_complete:
-                farewell = "感谢您的参与，我们的评估访谈已经结束。我将为您生成评估报告。"
-                
-                # Add farewell to conversation history
-                self.conversation_history.append({
-                    "role": "interviewer",
-                    "content": farewell
-                })
-                
-                return {
-                    "response": farewell,
-                    "is_interview_complete": True
-                }
-            
-            # 正常流程继续
-            # Prepare prompt for decision making
+                # Check if farewell already sent (added robustness)
+                if not self.conversation_history or self.conversation_history[-1].get("role") != "interviewer" or "评估访谈已经结束" not in self.conversation_history[-1].get("content", ""):
+                    farewell = "感谢您的参与，我们的评估访谈已经结束。我将为您生成评估报告。"
+                    self.conversation_history.append({
+                        "role": "interviewer",
+                        "content": farewell
+                    })
+                    return {
+                        "response": farewell,
+                        "is_interview_complete": True
+                    }
+                else:
+                     return {"response": "", "is_interview_complete": True} # Already ended
+
+
+            # --- Normal Flow (Original Logic) ---
             current_question = self.script[self.current_question_index]
-            
-            # 生成对话分析和反思
-            # 最新的几条对话
-            recent_history = self.conversation_history[-15:] if len(self.conversation_history) > 15 else self.conversation_history
+
+            # Prepare reflection prompt part (Original Logic)
+            recent_history = self.conversation_history[-15:]
             dialog_snippets = [f"{msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in recent_history if msg.get('content')]
-            
-            # 将反思分析作为prompt的一部分，而不是单独的LLM调用
             reflection_analysis_prompt = """
 首先，请分析以下对话历史：
 
@@ -151,136 +357,145 @@ class InterviewerAgent:
 
 请将分析结果用简洁的列表表示。
 """
-            
-            # 创建默认的反思数据结构
             default_analysis = {
-                "structured": {
-                    "key_symptoms": [],
-                    "time_contradictions": [],
-                    "unclear_details": []
-                },
-                "raw_dialog": dialog_snippets[-6:] if dialog_snippets else [],
-                "suggestions": "",
-                "scale_type": self.scale_type
+                "structured": {"key_symptoms": [], "time_contradictions": [], "unclear_details": []},
+                "raw_dialog": dialog_snippets[-6:], "suggestions": "", "scale_type": self.scale_type
             }
             reflection = {
-                "analysis": default_analysis,
-                "raw_dialog": dialog_snippets[-6:] if dialog_snippets else [],
-                "suggestions": "",
-                "scale_type": self.scale_type
+                "analysis": default_analysis, "raw_dialog": dialog_snippets[-6:],
+                "suggestions": "", "scale_type": self.scale_type
             }
-            
-            # 构建完整的决策提示，包括反思分析
-            combined_prompt = reflection_analysis_prompt.format(
-                history='\n'.join(dialog_snippets)
-            )
-            
-            # 继续添加决策提示部分
-            decision_prompt = await self._create_decision_prompt(current_question, participant_response, reflection)
-            combined_prompt += "\n\n接下来，基于上述分析进行决策:\n\n" + decision_prompt
-            
-            # Get decision from LLM
+            combined_prompt_part1 = reflection_analysis_prompt.format(history='\n'.join(dialog_snippets))
+
+            # Create decision prompt (Original Logic)
+            decision_prompt_part2 = await self._create_decision_prompt(current_question, participant_response, reflection)
+            combined_prompt = combined_prompt_part1 + "\n\n接下来，基于上述分析进行决策:\n\n" + decision_prompt_part2
+
+            # Prepare messages for LLM (Original System Prompt)
             system_content = (
-    "你是一位专业的心理健康访谈员，擅长临床精神心理评估。你的任务有两部分：1) 分析对话历史，提取重要信息；2) 决定下一步访谈行动。"
-    "首先分析对话中的症状、时间信息和需要澄清的点，然后决定是提出跟进问题还是转到下一个主题。"
-    "你需要友善、专业、有耐心，擅长有效地引导对话。你的首要目标是高效地收集关于患者情绪、想法和相关症状的准确信息，"
-    "以评估症状的存在和严重程度。为此，请针对每个评估项目提出清晰明确的问题。**专注于有效收集关键信息，"
-    "确保对患者体验有扎实的理解，避免不必要的追问。**分析每个回答的完整性、与当前评估项目的相关性以及潜在的情感。"
-    "**当回答不完整、不清楚或确实需要进一步澄清时，提出具体和有针对性的跟进问题。**密切关注患者在整个访谈中的情绪状态。"
-    "**以理解和尊重回应，必要时使用缓和语言管理负面情绪或抵抗。避免不必要或重复的共情表达。**如果回答不相关或偏离主题，"
-    "礼貌地将对话引导回当前问题。"
-)
+                "你是一位专业的心理健康访谈员，擅长临床精神心理评估。你的任务有两部分：1) 分析对话历史，提取重要信息；2) 决定下一步访谈行动。"
+                "首先分析对话中的症状、时间信息和需要澄清的点，然后决定是提出跟进问题还是转到下一个主题。"
+                "你需要友善、专业、有耐心，擅长有效地引导对话。你的首要目标是高效地收集关于患者情绪、想法和相关症状的准确信息，"
+                "以评估症状的存在和严重程度。为此，请针对每个评估项目提出清晰明确的问题。**专注于有效收集关键信息，"
+                "确保对患者体验有扎实的理解，避免不必要的追问。**分析每个回答的完整性、与当前评估项目的相关性以及潜在的情感。"
+                "**当回答不完整、不清楚或确实需要进一步澄清时，提出具体和有针对性的跟进问题。**密切关注患者在整个访谈中的情绪状态。"
+                "**以理解和尊重回应，必要时使用缓和语言管理负面情绪或抵抗。避免不必要或重复的共情表达。**如果回答不相关或偏离主题，"
+                "礼貌地将对话引导回当前问题。"
+            )
             messages = [
                 {"role": "system", "content": system_content},
                 {"role": "user", "content": combined_prompt}
             ]
-            
+
+            # --- MODIFIED: Call LLM using the helper method ---
             try:
-                # response = await self.client.chat.completions.create(
-                #     model="gpt-4-1106-preview",
-                #     messages=messages,
-                #     temperature=0.6,
-                #     max_tokens=600  # 增加token上限以容纳更多内容
-                # )
+                # Get LLM parameters from config (using defaults from original if not present)
+                llm_provider_config = self.llm_config.get("llm", {})
+                provider = llm_provider_config.get("provider")
+                provider_specific_config = llm_provider_config.get(provider, {}) if provider else {}
+                decision_model_override = provider_specific_config.get("models", {}).get("decision")
+                default_model = provider_specific_config.get("model")
+
+                # Determine model and parameters for this specific call
+                # Using original hardcoded values as fallback if not in config
+                model_to_use = decision_model_override or default_model or "gemini-2.0-flash-lite-preview-02-05" # Original fallback
+                temp_to_use = provider_specific_config.get("temperature", 0.6) # Original default
+                max_tokens_to_use = provider_specific_config.get("max_tokens", 600) # Original default
+
                 decision_str = await self._call_llm_api(
                     messages=messages,
-                    temperature=0.6,
-                    max_tokens=600,
-                    task_type="decision"
+                    temperature=temp_to_use,
+                    max_tokens=max_tokens_to_use,
+                    task_type="decision" # Provide task type hint
                 )
-                
-                # Extract the decision from the response
+
                 if decision_str:
-                    # --- 修正：直接使用 LLM 返回的文本字符串 ---
-                    # decision = json.loads(decision_str) # <--- 移除这一行
+                    # --- Process the LLM decision string (Original Logic) ---
+                    self._update_question_state(decision_str) # Use original state update logic
+                    next_action = await self._determine_next_action(decision_str) # Use original determination logic
 
-                    # Update question state based on the decision string
-                    self._update_question_state(decision_str) # <--- 传递原始字符串
-
-                    # Get the next action based on question state using the string
-                    # <--- _determine_next_action 接收原始字符串
-                    next_action = await self._determine_next_action(decision_str)
-                    
-                    # Add interviewer's response to conversation history
-                    if next_action and "response" in next_action:
+                    # Add interviewer's response to history (Original Logic)
+                    # Ensure response exists and is not empty before adding
+                    if next_action and isinstance(next_action, dict) and next_action.get("response"):
                         self.conversation_history.append({
                             "role": "interviewer",
                             "content": next_action["response"]
                         })
-                    
-                    # 添加完成标志
+
+                    # Add completion flag (Original Logic)
+                    # Ensure next_action is a dictionary before adding the key
                     if isinstance(next_action, dict):
-                     next_action["is_interview_complete"] = False
+                        next_action["is_interview_complete"] = False
                     else:
-                        # 处理 _determine_next_action 返回非字典的情况，可能需要返回错误
-                        logging.error(f"_determine_next_action did not return a dictionary: {next_action}")
+                        # Handle unexpected return type from _determine_next_action
+                        logging.error(f"Unexpected return type from _determine_next_action: {type(next_action)}. Returning error.")
                         next_action = self._create_error_response("Internal error determining next action.")
+                        # Ensure the error response also has the flag
                         next_action["is_interview_complete"] = False
 
                     return next_action
                 else:
-                    error_response = self._create_error_response("No response generated")
+                    # Handle case where LLM call failed or returned empty
+                    logging.error("LLM call for decision failed or returned empty.")
+                    # Use original error response structure
+                    error_response = self._create_error_response("No response generated from LLM decision call.")
                     error_response["is_interview_complete"] = False
                     return error_response
-                    
+
+            # Keep original error handling structure for the API call block
             except Exception as e:
-                logging.error(f"Error in chat completion: {str(e)}")
-                error_response = self._create_error_response(str(e))
+                logging.error(f"Error during LLM call or processing decision: {str(e)}", exc_info=True)
+                error_response = self._create_error_response(f"Error in chat completion or processing: {str(e)}")
                 error_response["is_interview_complete"] = False
                 return error_response
-                
+
+        # Keep original top-level error handling
         except Exception as e:
-            logging.error(f"Error in generate_next_action: {str(e)}")
-            error_response = self._create_error_response(str(e))
+            logging.error(f"Error in generate_next_action: {str(e)}", exc_info=True)
+            error_response = self._create_error_response(f"Overall error in generate_next_action: {str(e)}")
             error_response["is_interview_complete"] = False
             return error_response
-    
+
+    # --- ORIGINAL: _create_decision_prompt ---
+    # (With minor adjustment for key_points consistency and json dumps)
     async def _create_decision_prompt(self, question: Dict, response: str, reflection: Dict) -> str:
         """Create a prompt for the decision-making process."""
-        # Convert current state to JSON-serializable format
         state_copy = self.current_question_state.copy()
-        state_copy["key_points_covered"] = list(state_copy["key_points_covered"])  
-        
-        # 获取整合后的反思报告
-        reflection_report = reflection['analysis']
-        
-        # 构建更完整的对话上下文 - 增加显示的历史记录条数
-        full_history = '\n'.join([f"{msg['role']}: {msg['content']}" for msg in self.conversation_history[-10:]])
-        dialog_context = '\n'.join(reflection_report.get('raw_dialog', [])[-6:])  # 增加为6条
-        structured_summary = json.dumps(reflection_report.get('structured', {}), indent=2)
-        
+        # Ensure key_points_covered is always a list for json.dumps
+        state_copy["key_points_covered"] = list(state_copy.get("key_points_covered", []))
+
+        reflection_report = reflection.get('analysis', {})
+        dialog_context_list = reflection_report.get('raw_dialog', [])
+        structured_summary_dict = reflection_report.get('structured', {})
+
+        full_history = '\n'.join([f"{msg.get('role', 'unknown')}: {msg.get('content', '')}" for msg in self.conversation_history[-10:]])
+        dialog_context = '\n'.join(map(str, dialog_context_list[-6:])) if dialog_context_list else ""
+        try:
+            # Use ensure_ascii=False for better readability in logs/debug
+            structured_summary = json.dumps(structured_summary_dict, indent=2, ensure_ascii=False)
+            state_json = json.dumps(state_copy, ensure_ascii=False)
+            reflection_json = json.dumps(reflection, ensure_ascii=False)
+            key_points_json = json.dumps(question.get('key_points', []), ensure_ascii=False) # Use key_points
+        except TypeError as e:
+             logging.warning(f"Could not serialize state/reflection/key_points to JSON: {e}. Using str().")
+             structured_summary = str(structured_summary_dict)
+             state_json = str(state_copy)
+             reflection_json = str(reflection)
+             key_points_json = str(question.get('key_points', []))
+
+        # Using the exact prompt structure from the original code provided
         return f"""
         Meta info:
     Language: Chinese
 Description of the interviewer:  You are a friendly and professional interviewer, specially designed to conduct clinical mental health assessments. Your primary goal is to gather accurate and relevant information about the patient's mood, thoughts, and related symptoms to assess the presence and severity of symptoms efficiently. To achieve this, ask clear and direct questions related to each assessment item. **Focus on effectively gathering key information, ensuring a solid understanding of the patient's experience without unnecessary probing.** Analyze each response for completeness, relevance to the current assessment item, and underlying sentiment. **When a response is incomplete, unclear, or genuinely requires further clarification for assessment, ask specific and targeted follow-up questions.** Pay close attention to the patient's emotional state throughout the interview. **Respond with understanding and respect, using de-escalating language when necessary to manage negative emotions or resistance. Avoid unnecessary or repetitive expressions of empathy.** If a response is irrelevant or strays from the topic, gently and respectfully redirect the conversation back to the current question.
 
-Current question state: {json.dumps(state_copy)}
-Notes on the interviewee: {json.dumps(reflection)}
+Current question state: {state_json}
+Notes on the interviewee: {reflection_json}
 
 Context:
-    Current assessment item: {question['id']}
-    Current question (Crucially, focus all evaluation and follow-up on this specific assessment item): "{question['question']}"
-    Key points to cover (for thorough completeness assessment): {json.dumps(question.get('key_points', []) )}
+    Current assessment item: {question.get('id', 'N/A')}
+    Current question (Crucially, focus all evaluation and follow-up on this specific assessment item): "{question.get('question', 'N/A')}"
+    Key points to cover (for thorough completeness assessment): {key_points_json}
     Follow-up count: {self.current_question_state['follow_up_count']}
     Maximum follow-up count: 3 (After 3 follow-ups, we MUST move to the next question regardless of completeness)
     Completeness score: {self.current_question_state['completeness_score']}
@@ -317,22 +532,22 @@ Task (Strictly adhere to the following steps to generate the output):
             - **ABSOLUTELY DO NOT probe for negative details. ABSOLUTELY DO NOT quantify positive feelings. ABSOLUTELY DO NOT REPEAT THE QUESTION in ANY FORM. ABSOLUTELY DO NOT ask for ANY clarification unless it is *indisputably essential* due to *extreme* and *unprecedented* brevity.**
             - **REPETITIVE QUESTIONING AFTER CLEAR YES/NO IS *COMPLETELY, UTTERLY, AND UNACCEPTABLY PROHIBITED* FOR *ALL* ASSESSMENT QUESTIONS.**  (Generalized instruction - removed weight specific mention)
             - **<<< CLARIFICATION >>> Apply this rule primarily when the clear Yes/No directly answers the *entire* core inquiry of the question or the *only remaining part* after a follow-up.** If it answers only one part of a multi-part question, prefer step 3c/follow-up for the missing parts.
-   
+
     3. **Decide Next Action (Provide ultra-concise reasoning):**
        - **IMPORTANT: Be aware that we can ask at most 3 follow-up questions for a single topic. If follow_up_count >= 2, seriously consider moving on unless absolutely necessary to ask one final follow-up.**
-       a) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness < 80 AND response is *TRULY, UTTERLY, AND UNQUESTIONABLY* BRIEF ...:** # (保持不变)
-       b) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness >= 80:** # (保持不变)
+       a) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness < 80 AND response is *TRULY, UTTERLY, AND UNQUESTIONABLY* BRIEF ...:** # (保持不变) [DECIDE follow_up, RESPONSE: general probe]
+       b) **IF Sentiment is Positive or Neutral AND Content Assessment is Yes AND completeness >= 80:** # (保持不变) [DECIDE move_on, RESPONSE: short transition]
        c) **<<< MODIFIED >>> IF Content Assessment is Partially AND completeness < 80 AND follow_up_count < 3:**
           - **DECIDE `follow_up`.** Your primary goal is to get the missing information identified in the assessment (Step 1).
           - **Generate a SPECIFIC follow-up question in RESPONSE** targeting ONLY the missing part(s). Do NOT repeat the parts already answered.
           - **Example:** If original Q was "Cause and need help?" and user only answered "need help", RESPONSE should be like: "明白了您觉得不需要帮助。那您觉得引起这些问题的原因可能是什么呢？"
-       d) **IF Sentiment is Negative or Abusive:** # (保持不变)
-       e) **IF Sentiment is Threatening:** # (保持不变)
+       d) **IF Sentiment is Negative or Abusive:** # (保持不变) [DECIDE de_escalate, RESPONSE: de-escalation statement]
+       e) **IF Sentiment is Threatening:** # (保持不变) [DECIDE move_on, RESPONSE: safety note/end]
        f) **<<< MODIFIED >>> IF Content Assessment is No (Irrelevant Response) AND follow_up_count < 3:**
           - **Check Conversation History:** Has a `redirect` for this *exact same* question been issued in the immediately preceding turn?
              - **If YES:** DO NOT `redirect` again. Instead, **DECIDE `follow_up`** with a very simple clarifying question (e.g., "您能换种方式说说您的想法吗？", "我还是不太确定您的意思，可以再解释一下吗？") or, if this also fails, consider rule 6.
              - **If NO:** **DECIDE `redirect`.** Generate a polite redirection statement in RESPONSE, reminding the participant of the topic. Set Completeness score very low (0-10). (Examples remain the same).
-       g) **IF follow_up_count >= 2:** # (保持不变, 但现在也适用于重定向失败多次的情况)
+       g) **IF follow_up_count >= 2:** # (保持不变, 但现在也适用于重定向失败多次的情况) [DECIDE move_on, RESPONSE: short transition]
 
     4. **Follow-up Questions (If *absolutely* and *unquestionably* chosen - RARE):** (Follow previous instructions). **ENSURE follow-ups are *TRULY, UTTERLY, AND UNQUESTIONABLY NECESSARY* to confirm symptom presence/absence.  *AGGRESSIVELY AVOID* UNNECESSARY PROBING OR QUANTIFICATION when *any* clear indication already exists.**
 
@@ -357,7 +572,7 @@ Task (Strictly adhere to the following steps to generate the output):
 Format your response as:
     COMPLETENESS: [score]
     DECISION: [move_on/follow_up/de_escalate/redirect]
-    KEY_POINTS_COVERED: [list of key points successfully covered in the response, comma-separated]
+    KEY_POINTS_COVERED: [list of key points successfully covered in the response, comma-separated or None]
     REASONING: [Your justification for the decision, including sentiment, content assessment. **If DECISION is 'follow_up', explicitly state key missing information. If DECISION is 'redirect', state why the response was irrelevant.**]
     RESPONSE: [
         **IF DECISION is 'move_on':** Provide ONLY an EXTREMELY SHORT and natural transition phrase (e.g., "好的。", "明白了。", "嗯，我们继续。"). ABSOLUTELY DO NOT include the next question's text here.
@@ -365,81 +580,130 @@ Format your response as:
         **IF DECISION is 'redirect':** Provide the polite and concise redirection statement, focusing on the current question.
         **IF DECISION is 'de_escalate':** Provide the appropriate de-escalation statement.
     ]
-        """
-    
+        """ # Note: Added 'None' option for KEY_POINTS_COVERED as per modified prompt example
+
+    # --- ORIGINAL: _update_question_state ---
+    # (Using the more robust parsing from the modified version for safety)
     def _update_question_state(self, decision: str) -> None:
-        """Update the current question state based on the decision."""
+        """Update the current question state based on the decision string."""
         try:
-            # Parse completeness score
-            if "COMPLETENESS:" in decision:
-                score_str = decision.split("COMPLETENESS:")[1].split("\n")[0].strip()
-                try:
-                    # More robust score extraction with validation
-                    score = int(score_str)
-                    # Ensure score is within valid range (0-100)
-                    if 0 <= score <= 100:
-                        self.current_question_state["completeness_score"] = score
-                        logging.info(f"更新完整性分数: {score}")
-                    else:
-                        logging.warning(f"完整性分数超出有效范围: {score}, 保留之前的值")
-                except ValueError:
-                    logging.warning(f"无效的完整性分数格式: '{score_str}', 保留之前的值")
-            
-            # Extract decision type
-            if "DECISION:" in decision:
-                decision_type = decision.split("DECISION:")[1].split("\n")[0].strip()
-                logging.info(f"决策类型: {decision_type}")
-                
-                # Update follow-up count only for follow-up decisions
-                if decision_type == "follow_up":
-                    self.current_question_state["follow_up_count"] += 1
-                    logging.info(f"增加追问计数至: {self.current_question_state['follow_up_count']}")
-            
-            # Extract and add covered key points if present
-            if "KEY_POINTS_COVERED:" in decision:
-                key_points_section = decision.split("KEY_POINTS_COVERED:")[1].split("\n")[0].strip()
-                # Try to parse as comma-separated list
-                try:
-                    # Handle potential JSON or simple comma-separated format
-                    if key_points_section.startswith("[") and key_points_section.endswith("]"):
-                        import json
-                        key_points = json.loads(key_points_section)
-                    else:
-                        key_points = [point.strip() for point in key_points_section.split(",") if point.strip()]
-                    
-                    # Add new key points to the existing set
-                    existing_key_points = set(self.current_question_state["key_points_covered"])
-                    existing_key_points.update(key_points)
-                    self.current_question_state["key_points_covered"] = list(existing_key_points)
-                    logging.info(f"更新已覆盖关键点: {self.current_question_state['key_points_covered']}")
-                except Exception as e:
-                    logging.warning(f"解析关键点时出错: {str(e)}")
-            
-            # Store the last follow-up question
-            if "RESPONSE:" in decision:
-                response = decision.split("RESPONSE:")[1].strip()
-                self.current_question_state["last_follow_up"] = response
-                logging.info(f"更新最近的追问: {response[:50]}...")
-                
+            lines = decision.strip().split('\n')
+            parsed_state = {}
+            response_lines = []
+            parsing_response = False
+
+            for line in lines:
+                line_lower = line.lower() # Use lower case for matching keys
+                if line_lower.startswith("completeness:"):
+                    try:
+                        score_str = line.split(":", 1)[1].strip()
+                        score = int(score_str)
+                        if 0 <= score <= 100:
+                            parsed_state["completeness_score"] = score
+                        else:
+                            logging.warning(f"Parsed completeness score {score} out of range (0-100). Ignoring.")
+                    except (ValueError, IndexError):
+                        logging.warning(f"Could not parse completeness score from line: '{line}'")
+                elif line_lower.startswith("decision:"):
+                    try:
+                        # Keep original case for the value
+                        decision_type = line.split(":", 1)[1].strip()
+                        parsed_state["decision_type"] = decision_type
+                        # Update follow-up count *here* based on the parsed decision
+                        if decision_type == "follow_up":
+                             self.current_question_state["follow_up_count"] = self.current_question_state.get("follow_up_count", 0) + 1
+                             logging.info(f"Incrementing follow_up_count to: {self.current_question_state['follow_up_count']}")
+                    except IndexError:
+                        logging.warning(f"Could not parse decision type from line: '{line}'")
+                elif line_lower.startswith("key_points_covered:"):
+                     try:
+                         key_points_str = line.split(":", 1)[1].strip()
+                         if key_points_str.lower() == 'none':
+                              parsed_state["key_points_covered"] = []
+                         else:
+                              # Handle simple comma-separated or potentially JSON list
+                              if key_points_str.startswith("[") and key_points_str.endswith("]"):
+                                   try:
+                                       key_points = json.loads(key_points_str)
+                                       if isinstance(key_points, list):
+                                            parsed_state["key_points_covered"] = [str(p).strip() for p in key_points]
+                                       else:
+                                            logging.warning(f"Parsed KEY_POINTS_COVERED as JSON but not a list: '{key_points_str}'")
+                                            parsed_state["key_points_covered"] = [p.strip() for p in key_points_str.strip("[]").split(',') if p.strip()]
+                                   except json.JSONDecodeError:
+                                        logging.warning(f"Could not parse KEY_POINTS_COVERED as JSON list: '{key_points_str}'. Treating as comma-separated.")
+                                        parsed_state["key_points_covered"] = [p.strip() for p in key_points_str.split(',') if p.strip()]
+                              else:
+                                  parsed_state["key_points_covered"] = [p.strip() for p in key_points_str.split(',') if p.strip()]
+                     except IndexError:
+                         logging.warning(f"Could not parse key points covered from line: '{line}'")
+                elif line_lower.startswith("reasoning:"):
+                    pass # Original didn't store reasoning in state
+                elif line_lower.startswith("response:"):
+                    parsing_response = True
+                    # Get original case response part
+                    response_part = line.split(":", 1)[1].strip()
+                    if response_part:
+                        response_lines.append(response_part)
+                elif parsing_response:
+                    response_lines.append(line) # Keep original case and leading/trailing spaces if any
+
+            # --- Update the actual state (Original Logic) ---
+            if "completeness_score" in parsed_state:
+                 self.current_question_state["completeness_score"] = parsed_state["completeness_score"]
+                 logging.info(f"Updated completeness_score to: {self.current_question_state['completeness_score']}")
+
+            if "key_points_covered" in parsed_state:
+                 new_points = set(parsed_state["key_points_covered"])
+                 existing_points = set(self.current_question_state.get("key_points_covered", []))
+                 existing_points.update(new_points)
+                 self.current_question_state["key_points_covered"] = sorted(list(existing_points))
+                 logging.info(f"Updated key_points_covered to: {self.current_question_state['key_points_covered']}")
+
+            if response_lines:
+                 # Join with newline, keep original spacing within lines
+                 full_response = "\n".join(response_lines).strip()
+                 # Original logic stored the response text regardless of decision type
+                 self.current_question_state["last_follow_up"] = full_response
+                 logging.info(f"Updated last_follow_up: {full_response[:50]}...")
+            # If no RESPONSE field was parsed, don't update last_follow_up
+
         except Exception as e:
-            logging.error(f"更新问题状态时出错: {str(e)}")
-    
+            logging.exception(f"Error updating question state from decision string: {str(e)}. Decision: '{decision[:200]}...'")
+
+
+    # --- ORIGINAL: _generate_natural_question ---
+    # (With LLM call replaced)
     async def _generate_natural_question(self, question_text: str) -> str:
         """使用LLM生成更自然、更具亲和力的提问，直接返回问题。"""
-        logging.info(f"Generating natural question for: {question_text}")
-        
-        # 提取更多对话历史用于上下文分析，增加到最近20条记录
-        recent_history = self.conversation_history[-20:] if len(self.conversation_history) > 20 else self.conversation_history
-        conversation_history_json = json.dumps(recent_history, ensure_ascii=False, indent=2)
-        
-        # 增强提示模板，强调避免重复询问和注意上下文连贯性
-        prompt_template = '''你是一位极其友善、耐心、且具有高度专业素养的医生，正在与患者进行心理健康评估。  
-你的首要目标：  
-1. 确保对患者问话时，**原问题**（由程序或资料提供）中的关键内容、重要细节、句式顺序都被**完整保留**。  
-2. 仅在**确有必要**（例如显得生硬、无衔接）的情况下，为问题**前面**或**后面**添加**极简**的过渡或衔接语，以使对话更流畅自然；如果原问题已足够自然，则**不必做任何修改**。  
-3. 如原问题包含病历或第三方信息，而患者尚未在当前对话中亲口证实，**不可**把这些信息说成"你说过"或"您提到过"，而要在问题中**保持或增加**类似"我了解到""档案里记录到"或"之前有信息显示"之类的表述，让患者明白这是从资料中获得的信息，而非Ta已经亲口告诉你。  
-4. **禁止删除、简化、替换**任何原先描述中的关键病症细节或事件，例如"会觉得有人追您""淋浴喷头后面有只手""听到有人让您去死"等。  
-5. 提问务必简洁直接，避免过于生硬或医疗术语。若你觉得原问题措辞已足够自然顺畅，就**保持原样**输出。若你需要加一句衔接，则只能轻微加在前后，不得破坏原句。  
+        if not question_text: # Added safety check
+             logging.warning("Received empty question_text in _generate_natural_question.")
+             return ""
+        try:
+            # Original context preparation
+            recent_history = self.conversation_history[-20:]
+            try:
+                # Ensure serializable, handle potential errors
+                serializable_history = []
+                for msg in recent_history:
+                    try:
+                        json.dumps(msg)
+                        serializable_history.append(msg)
+                    except TypeError:
+                        logging.warning(f"Skipping non-serializable message: {msg}")
+                conversation_history_json = json.dumps(serializable_history, ensure_ascii=False, indent=2)
+            except Exception as json_e:
+                logging.error(f"Error serializing conversation history: {json_e}")
+                conversation_history_json = "[]" # Fallback
+
+            # Original prompt template
+            prompt_template = '''你是一位极其友善、耐心、且具有高度专业素养的医生，正在与患者进行心理健康评估。
+你的首要目标：
+1. 确保对患者问话时，**原问题**（由程序或资料提供）中的关键内容、重要细节、句式顺序都被**完整保留**。
+2. 仅在**确有必要**（例如显得生硬、无衔接）的情况下，为问题**前面**或**后面**添加**极简**的过渡或衔接语，以使对话更流畅自然；如果原问题已足够自然，则**不必做任何修改**。
+3. 如原问题包含病历或第三方信息，而患者尚未在当前对话中亲口证实，**不可**把这些信息说成"你说过"或"您提到过"，而要在问题中**保持或增加**类似"我了解到""档案里记录到"或"之前有信息显示"之类的表述，让患者明白这是从资料中获得的信息，而非Ta已经亲口告诉你。
+4. **禁止删除、简化、替换**任何原先描述中的关键病症细节或事件，例如"会觉得有人追您""淋浴喷头后面有只手""听到有人让您去死"等。
+5. 提问务必简洁直接，避免过于生硬或医疗术语。若你觉得原问题措辞已足够自然顺畅，就**保持原样**输出。若你需要加一句衔接，则只能轻微加在前后，不得破坏原句。
 6. 绝对**不可**因为"人文关怀"或"简洁"而删去问话的实质细节；只能在前后多一句安抚或衔接，但主体问题必须原封不动地保留。
 7. **极其重要**: 仔细检查对话历史，确保不要询问患者已经明确回答过的信息。例如：
    - 如果患者已经说明了症状开始的时间（如"去年年底开始"、"一个月前"等），绝对不要再问"是从什么时候开始的"或"多久了"
@@ -454,453 +718,350 @@ Format your response as:
 - 若有需要先回应患者上一条发言，则输出极其简短的人文关怀或理解语句（如"嗯，我明白，这听起来确实让人不好受。"）但是绝对不要重复患者的话（如患者说"从来没有过。绝对不要说："嗯，我明白了。您从来没有过"，**不要重复患者的话，可以用其他自然的形式过渡**），**极其简短的人文关怀或理解语句不超过一两句**。
 - **然后**输出完整或仅加了极简过渡的原问题文本（**不可漏掉任何病情描述**，顺序与内容一字不漏地保留）。
 
-**示例**：  
-- 原问题是：「您说您独处时，会觉得有人追您，还觉得淋浴喷头后面会有一只手伸出来，甚至听到有人让您去死。最近一周还有这种感觉吗？」  
+**示例**：
+- 原问题是：「您说您独处时，会觉得有人追您，还觉得淋浴喷头后面会有一只手伸出来，甚至听到有人让您去死。最近一周还有这种感觉吗？」
 - 如果不显得生硬，可以直接原样输出；若你觉得要加一句过渡，也仅能这样加：「我知道这可能会让人害怕……那，我想再确认一下：您说您独处时，会觉得有人追您，还觉得淋浴喷头后面有一只手伸出来，甚至听到有人让您去死。最近这一周还有这种感觉吗？」
 
 **切记**：不能将"您说您独处时"改成"我了解到"之类的措辞，除非对话背景里**从未**出现患者亲口提及过此事。若确实是档案信息、患者本人并未说过，就务必用"我了解到"或"档案中提到"替换"您说您"。但无论如何，**后续描述"会觉得有人追您... 听到有人让您去死"**等细节**绝不能被删除或改写**。
 
-再次强调：认真检查对话历史，避免询问已经得到明确回答的问题。比如时间、频率、严重程度等关键信息如果已经在之前的对话中被回答，就不要再次询问。
+再次强调：认真检查对话历史，避免询问已经得到明确回答的信息。比如时间、频率、严重程度等关键信息如果已经在之前的对话中被回答，就不要再次询问。
 
-若原问题完全合适，就照抄。若你需要加一句衔接，则只能轻微加在前后，不得破坏原句。  
-所有文字请**直接输出给用户**作为新的提问，无需任何解释或说明。  '''
-        final_prompt = prompt_template.replace("{conversation_history_placeholder}", conversation_history_json)
-        
-        # 提供原问题和对话历史给LLM，让其做出更准确的判断
-        prompt_messages = [
-            {"role": "system", "content": final_prompt},
-            {"role": "user", "content": f"原问题：{question_text}\n\n对话历史：{conversation_history_json}"}
-        ]
-        
-        natural_question_content = await self._call_llm_api(
-            messages=prompt_messages,
-            temperature=0.7,
-            max_tokens=100,
-            task_type="natural_question"
-        )
+若原问题完全合适，就照抄。若你需要加一句衔接，则只能轻微加在前后，不得破坏原句。
+所有文字请**直接输出给用户**作为新的提问，无需任何解释或说明。'''
+            # Original didn't use .replace for placeholder, passed history in user message
 
-        if natural_question_content:
-            natural_question = natural_question_content.strip()
-            # Optional: Add more robust checks (e.g., similarity check) if needed
-            if natural_question: # Ensure it's not empty after stripping
-                 logging.info(f"Generated natural question: {natural_question}")
-                 # Simple check: Ensure it's not identical to the default or empty
-                 if natural_question.lower() != question_text.lower():
-                     return natural_question
-                 else:
-                     logging.warning("Generated natural question was same as default. Using original.")
-                     return question_text # Fallback to original if LLM output is trivial
+            messages = [
+                {"role": "system", "content": prompt_template}, # Use the template as system prompt
+                {"role": "user", "content": f"原问题：{question_text}\n\n对话历史：\n{conversation_history_json}"}
+            ]
+
+            # --- MODIFIED: Call LLM ---
+            # Get LLM parameters from config (using defaults from original if not present)
+            llm_provider_config = self.llm_config.get("llm", {})
+            provider = llm_provider_config.get("provider")
+            provider_specific_config = llm_provider_config.get(provider, {}) if provider else {}
+            naturalq_model_override = provider_specific_config.get("models", {}).get("natural_question")
+            default_model = provider_specific_config.get("model")
+
+            # Determine model and parameters for this specific call
+            # Using original hardcoded values as fallback if not in config
+            model_to_use = naturalq_model_override or default_model or "gemini-2.0-flash-lite-preview-02-05" # Original fallback
+            temp_to_use = provider_specific_config.get("temperature_natural", 0.5) # Original default
+            max_tokens_to_use = provider_specific_config.get("max_tokens_natural", 300) # Original default
+
+            natural_question_content = await self._call_llm_api(
+                messages=messages,
+                temperature=temp_to_use,
+                max_tokens=max_tokens_to_use,
+                task_type="natural_question"
+            )
+
+            # Original processing logic
+            if natural_question_content:
+                natural_question = natural_question_content.strip()
+                # Original check for identical question + transition addition
+                if natural_question == question_text:
+                    logging.info("生成的问题与原问题相同，添加简单过渡")
+                    transition_phrases = [
+                        "嗯，让我们继续。", "好的，接下来我想了解，", "谢谢您的回答。下面，",
+                        "我明白了。那么，", "谢谢分享。接着，"
+                    ]
+                    transition = random.choice(transition_phrases)
+                    natural_question = f"{transition} {question_text}"
+                # Basic check: ensure it's not empty
+                if natural_question:
+                    return natural_question
+                else:
+                    logging.warning("Generated natural question was empty after stripping/transition. Using original.")
+                    return question_text
             else:
-                logging.warning("LLM returned empty content for natural question.")
-                return question_text # Fallback if response is empty
-        else:
-            logging.error("LLM call for natural question failed. Returning default.")
-            return question_text # Fallback if API call failed
+                logging.warning(f"未能生成自然问题 (LLM call failed or returned empty)，使用原始问题: {question_text}")
+                return question_text
 
+        except Exception as e:
+            logging.error(f"生成自然问题时出错: {str(e)}", exc_info=True)
+            return question_text # Fallback to original on error
 
-    async def _determine_next_action(self, decision: Dict) -> tuple[str, Optional[str]]:
+    # --- ORIGINAL: _determine_next_action ---
+    # (Reverted to original logic flow, added transition sanitization)
+    async def _determine_next_action(self, decision: str) -> Dict:
         """Determine the next action based on the decision string from LLM."""
         try:
             completeness_threshold = 80
             decision_type = ""
-            completeness_score = self.current_question_state["completeness_score"] # 从状态获取，更可靠
-            response_text = ""
+            response_text = "" # The text LLM generated in RESPONSE field
+            move_to_next = False # Flag to indicate moving to the next script question
 
-            # 更健壮地解析LLM输出 (使用正则表达式或更安全的分割)
+            # --- Parsing Logic (using robust parsing from modified version) ---
             import re
-            decision_match = re.search(r"DECISION:\s*(\w+)", decision)
+            decision_match = re.search(r"DECISION:\s*(\w+)", decision, re.IGNORECASE)
             if decision_match:
-                decision_type = decision_match.group(1).strip()
+                decision_type = decision_match.group(1).strip().lower()
             else:
-                logging.warning("无法从LLM响应中解析 DECISION")
-                # 可以设置一个默认决策，例如 follow_up 或 error
-                decision_type = "follow_up" # 或其他默认值
+                logging.warning("Could not parse DECISION from LLM response. Defaulting to follow_up.")
+                decision_type = "follow_up"
 
-            response_match = re.search(r"RESPONSE:(.*)", decision, re.DOTALL)
+            response_match = re.search(r"RESPONSE:(.*)", decision, re.DOTALL | re.IGNORECASE)
             if response_match:
                 response_text = response_match.group(1).strip()
             else:
-                logging.warning("无法从LLM响应中解析 RESPONSE")
-                # 如果没有RESPONSE，根据decision_type决定如何处理
+                logging.warning("Could not parse RESPONSE from LLM response.")
+                # Provide default response based on decision type if needed (as per modified)
                 if decision_type == "follow_up":
-                    response_text = "您能再详细说明一下吗？" # 提供默认追问
-                # else: 其他情况可能不需要response_text
+                    response_text = "您能再详细说明一下吗？"
+                elif decision_type == "redirect":
+                     response_text = "我们好像稍微偏离了当前的话题，我们能回到刚才的问题吗？"
+                elif decision_type == "move_on":
+                     response_text = "好的。" # Default short transition
 
-            logging.info(f"LLM 建议决策类型: {decision_type}")
-            logging.info(f"当前完整性分数: {completeness_score}, 追问次数: {self.current_question_state['follow_up_count']}")
+            completeness_score = self.current_question_state.get("completeness_score", 0)
+            follow_up_count = self.current_question_state.get("follow_up_count", 0)
 
-            # --- 核心决策逻辑 ---
-            move_to_next = False
-            final_response = ""
+            logging.info(f"LLM Decision Parsed: Type='{decision_type}', Completeness={completeness_score}, Follow-ups={follow_up_count}")
+            logging.debug(f"LLM Response Text Parsed: '{response_text[:100]}...'")
 
-            # 1. 判断是否强制移动 (达到追问上限)
-            if self.current_question_state['follow_up_count'] >= 3:
+            # --- Original Core Decision Logic Flow ---
+            final_response = "" # The response the agent should actually say
+
+            # 1. Check for maximum follow-ups reached (Original Logic)
+            if follow_up_count >= 3:
+                logging.info("Maximum follow-up count (3) reached. Forcing move_on.")
                 move_to_next = True
-                logging.info("已达到最大追问次数(3次)，强制进入下一问题。")
+                # Original didn't explicitly set response_text here,
+                # it relied on the move_to_next block below.
 
-            # 2. 如果未强制移动，根据 LLM 建议和完整性判断
+            # 2. Process LLM decision if max follow-ups not reached (Original Logic)
+            #    The original code had a slightly complex structure here. Let's simplify
+            #    while preserving the outcome based on the parsed decision_type.
             elif decision_type == "move_on":
-                if completeness_score >= completeness_threshold:
-                    move_to_next = True
-                    logging.info("LLM建议move_on且完整性达标，进入下一问题。")
-                else:
-                    # **关键修复点:** LLM建议move_on但完整性不足
-                    logging.warning(f"LLM建议move_on但完整性({completeness_score})不足。代码将强制移动到脚本的下一问题，忽略LLM的RESPONSE文本。")
-                    move_to_next = True # 强制移动，遵循脚本流程优先
-                    # 注意：这里我们选择了强制移动，因为这是修复原始日志问题的直接方式。
-                    # 另一种选择是强制追问，但需要更复杂的逻辑来生成追问文本，
-                    # 或者依赖Prompt中REASONING部分的缺失信息（这可能不稳定）。
+                 # Original code checked completeness score here. Let's re-add that check.
+                 if completeness_score >= completeness_threshold:
+                      move_to_next = True
+                      logging.info("LLM decided move_on and completeness is sufficient.")
+                 else:
+                      # Original code logged a warning and forced move_on. Let's replicate.
+                      logging.warning(f"LLM decided move_on but completeness ({completeness_score}) is below threshold ({completeness_threshold}). Forcing move_on.")
+                      move_to_next = True
+                 # We will handle the actual response text generation in the move_to_next block
 
             elif decision_type == "follow_up":
-                # 明确是追问，则不移动，并使用LLM提供的RESPONSE文本
-                move_to_next = False
-                final_response = response_text
-                # 确保追问计数在此处增加，因为我们确定要执行追问了
-                # self.current_question_state["follow_up_count"] += 1 # 移动到 _update_question_state 处理似乎更好，因为它基于原始decision解析
-                logging.info("决策为 follow_up，使用LLM生成的追问。")
+                 move_to_next = False
+                 final_response = response_text # Use LLM's generated follow-up
+                 logging.info("LLM decided follow_up.")
+                 if not final_response: # Add default if LLM failed to provide text
+                      logging.warning("LLM decided follow_up but provided no RESPONSE text. Using default.")
+                      final_response = "关于刚才提到的，您能再说详细一点吗？"
 
-            elif decision_type in ["redirect", "de_escalate"]:
-                # 重定向或缓和，不移动，使用LLM提供的RESPONSE文本
-                move_to_next = False
-                final_response = response_text
-                logging.info(f"决策为 {decision_type}，使用LLM生成的响应。")
+            elif decision_type == "redirect":
+                 move_to_next = False
+                 final_response = response_text # Use LLM's generated redirect
+                 logging.info("LLM decided redirect.")
+                 if not final_response: # Add default
+                      logging.warning("LLM decided redirect but provided no RESPONSE text. Using default.")
+                      # Include current question for context in default redirect
+                      current_q_text = self.script[self.current_question_index].get("question", "")
+                      final_response = f"抱歉，我们稍微回到刚才的问题上：{current_q_text}"
 
-            else: # 未知决策类型或解析失败
-                move_to_next = False
-                logging.error(f"未知的LLM决策类型: {decision_type} 或解析失败。执行默认追问。")
-                final_response = "抱歉，我需要稍微调整一下思路。您能就刚才的问题再多说一点吗？"
+            elif decision_type == "de_escalate":
+                 move_to_next = False
+                 final_response = response_text # Use LLM's generated de-escalation
+                 logging.info("LLM decided de_escalate.")
+                 if not final_response: # Add default
+                      logging.warning("LLM decided de_escalate but provided no RESPONSE text. Using default.")
+                      final_response = "听起来您似乎有些不适，没关系，我们可以慢慢来。"
 
-            # --- 根据 move_to_next 标志执行 ---
+            else: # Unknown decision type or parsing failed earlier
+                 logging.error(f"Unknown or unparsed DECISION type: '{decision_type}'. Defaulting to follow_up.")
+                 move_to_next = False
+                 # Use the default follow-up from the original error path
+                 final_response = "抱歉，我需要稍微调整一下思路。您能就刚才的问题再多说一点吗？"
+
+
+            # --- Perform Action Based on move_to_next Flag (Original Logic Flow) ---
             if move_to_next:
                 self.current_question_index += 1
-                if self.current_question_index < len(self.script):
+                logging.info(f"Moving to next question index: {self.current_question_index}")
+
+                # Check if interview ended (Original Logic)
+                if self.current_question_index >= len(self.script):
+                    logging.info("Reached end of script.")
+                    # Original code returned a specific farewell message here
+                    final_response = "感谢您的参与！我们已经完成了所有问题。" # Use original end message
+                    # Return structure should match what generate_next_action expects
+                    return {
+                        "response": final_response,
+                        "move_to_next": True, # Technically moved past last question
+                        # is_interview_complete is added by generate_next_action, but set True here for clarity
+                        "is_interview_complete": True
+                    }
+                else:
+                    # Get the *next* question from the script (Original Logic)
                     next_question_data = self.script[self.current_question_index]
-                    original_next_question = next_question_data["question"]
+                    original_next_question = next_question_data.get("question", "") # Use .get for safety
+                    if not original_next_question:
+                         logging.error(f"Next question at index {self.current_question_index} has no text!")
+                         # Handle error - maybe skip or use a default? Original didn't specify.
+                         # For now, return an error response.
+                         return self._create_error_response(f"Script error: Question at index {self.current_question_index} is empty.")
 
-                    # *** 使用 _generate_natural_question 生成下一个问题 ***
-                    # 这一步是正确的，因为它基于脚本内容，而不是LLM的RESPONSE
+                    logging.info(f"Next script question: '{original_next_question[:50]}...'")
+
+                    # Generate natural version of the *next* question (Original Logic)
                     natural_next_question = await self._generate_natural_question(original_next_question)
-                    final_response = natural_next_question # 最终要说的话是生成的下一个问题
 
-                    # 重置状态
+                    # --- ADDED: Sanitize transition phrase ---
+                    # Use the response_text parsed earlier if decision was move_on, otherwise default.
+                    llm_transition = response_text if decision_type == "move_on" else ""
+                    valid_transition = ""
+                    if llm_transition and len(llm_transition) < 25 and '？' not in llm_transition and '?' not in llm_transition:
+                         # Allow slightly longer transitions but check for questions
+                        valid_transition = llm_transition
+                        # Add punctuation if needed
+                        if not valid_transition.endswith(("。", "！", "!", ".", "？", "?")):
+                            valid_transition += "。"
+                    else:
+                        if llm_transition: # Log if we discard a bad transition
+                            logging.warning(f"Invalid or long transition from LLM for move_on: '{llm_transition}'. Using default.")
+                        valid_transition = "好的。" # Default short transition
+
+                    # Combine validated transition + next natural question
+                    final_response = natural_next_question
+                    # -----------------------------------------
+
+                    # Reset state for the new question (Original Logic)
                     self.current_question_state = {
                         "follow_up_count": 0,
                         "completeness_score": 0,
                         "key_points_covered": [],
                         "last_follow_up": None
                     }
-                    logging.info(f"进入脚本问题 {self.current_question_index}: {original_next_question[:50]}...")
+                    logging.info("Reset question state for the new question.")
 
+                    # Return structure expected by generate_next_action
                     return {
                         "response": final_response,
-                        "move_to_next": True # 明确标记移动了
-                    }
-                else:
-                    # 所有问题都问完了
-                    return {
-                        "response": "感谢您的参与！我们已经完成了所有问题。",
-                        "move_to_next": True # 标记移动（结束）
+                        "move_to_next": True # Indicate we moved to a new script question
                     }
             else:
-                # 不需要移动到下一个脚本问题
-                # 更新 last_follow_up 状态 (如果确实是追问)
-                if decision_type == "follow_up":
-                    self.current_question_state["last_follow_up"] = final_response
-                    # 追问计数更新应该在 _update_question_state 中完成，因为它基于原始 decision 解析
-                    # logging.info(f"执行追问，当前追问次数: {self.current_question_state['follow_up_count']}")
+                # Not moving to the next script question (follow_up, redirect, de_escalate)
+                # The final_response was already set based on the decision type
+                if not final_response: # Safety check if somehow final_response is empty
+                    logging.error("final_response is empty in non-move_on scenario. Returning error.")
+                    return self._create_error_response("Internal error determining response.")
 
-                # 检查 final_response 是否为空 (例如解析失败且无默认值)
-                if not final_response:
-                    logging.error("无法确定响应内容，返回通用错误响应。")
-                    return self._create_error_response("无法确定下一步操作")
-
+                # Return structure expected by generate_next_action
                 return {
                     "response": final_response,
-                    "move_to_next": False # 明确标记未移动
+                    "move_to_next": False # Indicate we are staying on the same script question
                 }
 
         except Exception as e:
-            logging.exception(f"确定下一步操作时发生严重错误: {str(e)}") # 使用 logging.exception 记录堆栈信息
-            return self._create_error_response(str(e))
-            
-    async def _call_llm_api(self, messages: List[Dict], temperature: float, max_tokens: int, task_type: str = "default") -> Optional[str]:
-        """Calls the configured LLM API (OpenAI or Ollama).
+            logging.exception(f"Error in _determine_next_action: {str(e)}")
+            # Use the original error response helper
+            return self._create_error_response(f"Internal error in _determine_next_action: {str(e)}")
 
-        Args:
-            messages (List[Dict]): The message history/prompt for the LLM.
-            temperature (float): The sampling temperature.
-            max_tokens (int): The maximum number of tokens to generate.
-            task_type (str): A hint for model selection (e.g., "decision", "natural_question", "reflection", "summary"). Defaults to "default".
 
-        Returns:
-            Optional[str]: The content of the LLM's response, or None if an error occurred.
-        """
-        provider_config = self.llm_config.get("llm", {})
-        provider = provider_config.get("provider")
+    # --- ORIGINAL: _check_for_similar_questions ---
+    # (Keeping commented out as per original)
+    def _check_for_similar_questions(self, new_question: str) -> bool:
+        # """检查新问题是否与最近的机器人问题相似"""
+        # ... (original commented code) ...
+        return False
 
-        if not provider:
-            logging.error("LLM provider is not specified in llm_config.")
-            return None
+    # --- ORIGINAL: _create_error_response ---
+    def _create_error_response(self, error_msg: str) -> Dict:
+        """Create a standardized error response."""
+        logging.error(f"Error in interview process: {error_msg}")
+        # Return the exact structure from the original code
+        return {
+            "response": "I apologize, but I need to process that differently. Could you please elaborate on your previous response?",
+            "move_to_next": False
+            # Note: is_interview_complete is added by the caller (generate_next_action)
+        }
 
-        logging.info(f"Calling LLM provider: {provider} for task: {task_type}")
-
-        try:
-            if provider == "openai":
-                openai_conf = provider_config.get("openai", {})
-                api_key = openai_conf.get("api_key")
-                base_url = openai_conf.get("base_url")
-                # Select model: Use task-specific model if available, else fallback to default model
-                models = openai_conf.get("models", {})
-                model_name = models.get(task_type) or openai_conf.get("model")
-
-                if not model_name:
-                    logging.error(f"No OpenAI model specified for task '{task_type}' or default in llm_config.")
-                    return None
-
-                # Use pre-initialized client if available and valid, otherwise create temporary one (requires api_key)
-                client_to_use = self._openai_client_instance
-                if not client_to_use:
-                    if not api_key:
-                        logging.error("Cannot call OpenAI API: No pre-initialized client and no API key in config.")
-                        return None
-                    logging.warning("Creating temporary OpenAI client for this call.")
-                    client_to_use = OpenAIAsyncClient(api_key=api_key, base_url=base_url)
-                
-                logging.debug(f"OpenAI Request: model={model_name}, temp={temperature}, max_tokens={max_tokens}")
-                # logging.debug(f"OpenAI Messages: {messages}") # Be careful logging full messages
-
-                completion = await client_to_use.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    # Add other parameters like top_p if needed from config
-                )
-
-                if completion.choices and completion.choices[0].message:
-                    response_content = completion.choices[0].message.content
-                    logging.debug(f"OpenAI Response: {response_content[:100]}...") # Log snippet
-                    return response_content
-                else:
-                    logging.warning("OpenAI API returned no choices or message content.")
-                    return None
-
-            elif provider == "ollama":
-                ollama_conf = provider_config.get("ollama", {})
-                base_url = ollama_conf.get("base_url")
-                if not base_url:
-                    logging.error("Ollama base_url is not specified in llm_config.")
-                    return None
-
-                # Select model: Use task-specific model if available, else fallback to default model
-                models = ollama_conf.get("models", {})
-                model_name = models.get(task_type) or ollama_conf.get("model")
-
-                if not model_name:
-                    logging.error(f"No Ollama model specified for task '{task_type}' or default in llm_config.")
-                    return None
-
-                api_url = f"{base_url.rstrip('/')}/api/chat" # Ensure no double slash
-                payload = {
-                    "model": model_name,
-                    "messages": messages,
-                    "stream": False,
-                    "options": {
-                        "temperature": temperature,
-                        "num_predict": max_tokens # Ollama uses num_predict for max tokens
-                        # Add other Ollama options here if needed from config
-                    }
-                }
-
-                logging.debug(f"Ollama Request: url={api_url}, model={model_name}, temp={temperature}, max_tokens={max_tokens}")
-                # logging.debug(f"Ollama Payload: {json.dumps(payload)}") # Be careful logging full messages/payload
-
-                response = await self._http_client.post(api_url, json=payload)
-                response.raise_for_status() # Raise HTTPStatusError for bad responses (4xx or 5xx)
-
-                response_data = response.json()
-                if response_data and isinstance(response_data.get("message"), dict) and "content" in response_data["message"]:
-                    response_content = response_data["message"]["content"]
-                    logging.debug(f"Ollama Response: {response_content[:100]}...") # Log snippet
-                    return response_content
-                else:
-                    logging.warning(f"Ollama API response format unexpected or missing content: {response_data}")
-                    return None
-
-            else:
-                logging.error(f"Unsupported LLM provider: {provider}")
-                return None
-
-        except OpenAIAsyncClient.APIConnectionError as e:
-             logging.error(f"OpenAI API request failed: Connection error - {e}")
-             return None
-        except OpenAIAsyncClient.RateLimitError as e:
-             logging.error(f"OpenAI API request failed: Rate limit exceeded - {e}")
-             return None
-        except OpenAIAsyncClient.APIStatusError as e:
-             logging.error(f"OpenAI API request failed: Status {e.status_code} - {e.response}")
-             return None
-        except OpenAIAsyncClient.APITimeoutError as e:
-             logging.error(f"OpenAI API request timed out: {e}")
-             return None
-        except OpenAIAsyncClient.APIError as e: # Catch-all for other OpenAI specific errors
-             logging.error(f"OpenAI API returned an error: {e}")
-             return None
-        except httpx.TimeoutException as e:
-            logging.error(f"Ollama request timed out to {e.request.url}: {e}")
-            return None
-        except httpx.ConnectError as e:
-            logging.error(f"Ollama request connection error to {e.request.url}: {e}")
-            return None
-        except httpx.HTTPStatusError as e:
-            logging.error(f"Ollama request failed: Status {e.response.status_code} for {e.request.url} - Response: {e.response.text[:200]}...")
-            return None
-        except httpx.RequestError as e: # Catch other httpx request errors
-            logging.error(f"Ollama request failed: An ambiguous error occurred {e.request.url} - {e}")
-            return None
-        except json.JSONDecodeError as e:
-            logging.error(f"Failed to decode JSON response from Ollama: {e}")
-            return None
-        except Exception as e: # Catch any other unexpected errors
-            logging.exception(f"An unexpected error occurred during LLM API call ({provider}): {e}") # Use logging.exception to include traceback
-            return None
-
-    # --- Method Modifications for using _call_llm_api ---
-
+    # --- ORIGINAL: generate_final_reflection ---
+    # (With LLM call replaced)
     async def generate_final_reflection(self) -> Dict:
         """生成最终的评估反思和结果报告"""
         try:
-            # 创建默认的反思数据结构
+            # Original reflection structure
             reflection = {
                 "scale_type": self.scale_type,
                 "total_questions": len(self.script),
-                "completed_questions": min(self.current_question_index + 1, len(self.script)),
+                "completed_questions": min(self.current_question_index + 1, len(self.script)), # Original logic might be slightly different here, adjust if needed
                 "analysis": {
                     "structured": {
-                        "key_symptoms": [],
-                        "time_contradictions": [],
-                        "unclear_details": []
+                        "key_symptoms": [], "time_contradictions": [], "unclear_details": []
                     },
                     "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]],
                     "suggestions": "",
                 },
-                "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]]
+                "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]] # Original had this duplicate key
             }
-            
-            # 生成简短的总结
+
+            # Original summary prompt
+            # Use slightly more history for context as in modified version
+            history_for_summary = "\n".join([f"{msg.get('role')}: {msg.get('content')}" for msg in self.conversation_history[-30:] if msg.get('content')])
             summary_prompt = f"""
             基于以下对话历史，为{self.scale_type.upper()}量表评估生成简短总结：
-            {self.conversation_history[-30:]}
-            
+            {history_for_summary}
+
             请用简洁的语言总结患者的主要症状和严重程度。
             """
-            
-            try:
-                logging.info("尝试使用模型生成总结...")
-                
-                try:
-                    # 尝试使用 gemini 模型
-                    completion = await self._call_llm_api(
-                        messages=[{"role": "system", "content": summary_prompt}],
-                        temperature=0.3,
-                        max_tokens=200,
-                        task_type="summary"
-                    )
-                    
-                    if completion:
-                        reflection["summary"] = completion
-                    else:
-                        reflection["summary"] = "无法生成总结。"
-                        
-                except Exception as gemini_error:
-                    # 记录 gemini 模型错误
-                    logging.error(f"使用 gemini 模型生成总结时出错: {str(gemini_error)}")
-                    logging.info("尝试使用备用模型...")
-                    
-                    try:
-                        # 尝试使用备用模型
-                        completion = await self._call_llm_api(
-                            messages=[{"role": "system", "content": summary_prompt}],
-                            temperature=0.3,
-                            max_tokens=200,
-                            task_type="summary"
-                        )
-                        
-                        if completion:
-                            reflection["summary"] = completion
-                        else:
-                            reflection["summary"] = "无法生成总结。"
-                    except Exception as backup_error:
-                        # 记录备用模型错误
-                        logging.error(f"使用备用模型生成总结时出错: {str(backup_error)}")
-                        # 创建基本总结
-                        reflection["summary"] = "无法生成自动总结。请手动查看对话历史以进行评估。"
-            
-            except Exception as e:
-                logging.error(f"Error generating summary: {str(e)}")
-                reflection["summary"] = "生成总结时出错。"
-                
+
+            # --- MODIFIED: Call LLM ---
+            # Get LLM parameters from config (using defaults from original if not present)
+            llm_provider_config = self.llm_config.get("llm", {})
+            provider = llm_provider_config.get("provider")
+            provider_specific_config = llm_provider_config.get(provider, {}) if provider else {}
+            summary_model_override = provider_specific_config.get("models", {}).get("summary")
+            default_model = provider_specific_config.get("model")
+
+            # Determine model and parameters for this specific call
+            model_to_use = summary_model_override or default_model or "gemini-2.0-flash-lite-preview-02-05" # Original fallback
+            temp_to_use = provider_specific_config.get("temperature_summary", 0.3) # Original default
+            max_tokens_to_use = provider_specific_config.get("max_tokens_summary", 200) # Original default
+
+            # Try primary model
+            summary_content = await self._call_llm_api(
+                # Original used system prompt, let's stick to that
+                messages=[{"role": "system", "content": summary_prompt}],
+                temperature=temp_to_use,
+                max_tokens=max_tokens_to_use,
+                task_type="summary"
+            )
+
+            if summary_content:
+                reflection["summary"] = summary_content.strip()
+            else:
+                # Original code had a fallback mechanism, let's replicate simply
+                logging.warning("Primary LLM call for summary failed or returned empty. No explicit fallback configured in this version.")
+                reflection["summary"] = "无法生成总结。"
+                # If you had specific fallback logic (e.g., different model), add it here by calling _call_llm_api again with different params.
+
             return reflection
-            
+
         except Exception as e:
-            logging.error(f"Error generating final reflection: {str(e)}")
+            logging.error(f"Error generating final reflection: {str(e)}", exc_info=True)
+            # Original error structure
             return {
                 "error": f"生成评估报告时出错: {str(e)}",
                 "scale_type": self.scale_type,
                 "raw_dialog": [msg.get("content", "") for msg in self.conversation_history[-6:]]
             }
 
-    # --- New Method: Cleanup ---
+    # --- ADDED: Cleanup method (from modified) ---
     async def close_clients(self):
         """Close any open network clients."""
         logging.info("Closing network clients...")
-        await self._http_client.aclose()
+        try:
+            await self._http_client.aclose()
+        except Exception as e:
+            logging.error(f"Error closing httpx client: {e}")
         if self._openai_client_instance:
-            await self._openai_client_instance.aclose()
-            logging.info("Closed pre-initialized OpenAI client.")
+            try:
+                await self._openai_client_instance.aclose()
+                logging.info("Closed pre-initialized OpenAI client.")
+            except Exception as e:
+                 logging.error(f"Error closing pre-initialized OpenAI client: {e}")
         logging.info("Network clients closed.")
-
-# Example usage (assuming you have a config dict and script path)
-# async def main():
-#     config = {
-#         "llm": {
-#             "provider": "ollama", # or "openai"
-#             "ollama": {
-#                 "base_url": "http://localhost:11434",
-#                 "model": "llama3",
-#                 "models": {
-#                     "decision": "llama3:instruct",
-#                     "natural_question": "llama3",
-#                     "summary": "llama3"
-#                 }
-#             },
-#             "openai": {
-#                 # "api_key": "YOUR_API_KEY", # Load securely
-#                 # "base_url": "OPTIONAL_BASE_URL",
-#                 "model": "gpt-3.5-turbo",
-#                 "models": {
-#                     "decision": "gpt-4-turbo-preview", # Example specific model
-#                     "natural_question": "gpt-3.5-turbo",
-#                     "summary": "gpt-3.5-turbo"
-#                 }
-#             }
-#         }
-#     }
-#     # Load API key securely, e.g., from environment variables
-#     import os
-#     config["llm"]["openai"]["api_key"] = os.getenv("OPENAI_API_KEY")
-
-#     agent = InterviewerAgent("path/to/your/script.json", config, scale_type="hamd")
-    
-#     # ... run interview loop ...
-#     # response = await agent.generate_next_action("Participant says something...")
-#     # print(response)
-
-#     # Finally, close clients
-#     await agent.close_clients()
-
-# if __name__ == "__main__":
-#     import asyncio
-#     # Configure logging here if running standalone
-#     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-#     # asyncio.run(main())

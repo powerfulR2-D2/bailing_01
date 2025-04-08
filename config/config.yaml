@@ -45,7 +45,7 @@ LLM:
     api_key: "sk-CXXoCNboW8t7jhL7KfrPZ8SkQ1XrU2Qv7KVCr1UT7S7ILorR"
   OllamaLLM:
     model_name: gemma3:27b
-    url: "https://a001-ollama.cpolar.cn"
+    url: "http://192.168.3.186:11434"
     api_key: ""
 
 llm:
@@ -57,17 +57,19 @@ llm:
     models:
       # Using model from LLM:OpenAILLM as default for tasks
       question_generation: "gemini-2.0-flash-lite-preview-02-05" 
-      agent_decision: "gemini-2.0-flash-lite-preview-02-05"      
+      agent_decision: "gemini-2.0-flash-lite-preview-02-05"
+      decision: "gemini-2.0-flash-lite-preview-02-05" 
       natural_question: "gemini-2.0-flash-lite-preview-02-05"    
     default_model: "gemini-2.0-flash-lite-preview-02-05"        
   ollama:
     # Placeholder values, adjust if switching provider to ollama
-    base_url: "https://a001-ollama.cpolar.cn" 
+    base_url: "http://192.168.3.186:11434" 
     models:
-      question_generation: "gemma3:27b"  
-      agent_decision: "gemma3:27b"       
-      natural_question: "gemma3:27b"     
-    default_model: "gemma3:27b"
+      question_generation: "deepseek-r1:70b"  # Model for generating questions
+      decision: "deepseek-r1:70b"       # Model for agent decisions
+      agent_decision: "deepseek-r1:70b"
+      natural_question: "deepseek-r1:70b"     # Model for generating natural questions
+    default_model: "deepseek-r1:70b"        # Add default model as fallback
 
 TTS:
   MacTTS:
