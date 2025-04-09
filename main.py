@@ -131,6 +131,7 @@ def push2web(payload, web_url="https://127.0.0.1:5001"):
     try:
         message_type = payload.get("type", "text")  # 默认为文本消息
         message_content = payload.get("content", "")
+        image_path = payload.get("image_path", None)
         logger.info(f"推送消息：类型 {message_type}, 内容 {message_content}")
 
         # 设置证书验证
@@ -145,7 +146,8 @@ def push2web(payload, web_url="https://127.0.0.1:5001"):
                 "type": "text",
                 "role": payload.get("role", "assistant"),
                 "content": message_content,
-                "need_confirm": payload.get("need_confirm")
+                "need_confirm": payload.get("need_confirm"),
+                "time_limit":payload.get("time_limit")
             }
             response = requests.post(url, headers=headers, data=json.dumps(payload).encode('utf-8'), verify=verify)
             logger.info(f"文本消息推送成功: {response.text}")
@@ -176,6 +178,7 @@ def push2web(payload, web_url="https://127.0.0.1:5001"):
 
         elif message_type in ['image', 'draw']:
             # 图片消息：上传图片文件到Web服务器
+            logger.info(f"推送消息：类型 {message_type}, 文件路径 {message_content}")
             if os.path.exists(message_content):  # 检查图片文件是否存在
                 url = f"{web_url}/upload_image"
                 with open(message_content, "rb") as image_file:
@@ -196,7 +199,7 @@ def push2web(payload, web_url="https://127.0.0.1:5001"):
                 else:
                     logger.error(f"图片文件上传失败: {response.text}")
             else:
-                logger.error(f"图片文件不存在: {message_content}")
+                logger.error(f"图片文件不存在: {image_path}")
 
         elif message_type == "video":
             # 视频消息：上传视频文件到Web服务器

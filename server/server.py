@@ -201,8 +201,10 @@ def add_message():
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'audio_file': '',
         'audio_url': '',
-        'need_confirm': data.get('need_confirm')
+        'need_confirm': data.get('need_confirm'),
+        'time_limit':data.get('time_limit')
     }
+    logger.info(f"收到消息：{message}")
 
     # 处理音频消息
     if message['type'] == 'audio':

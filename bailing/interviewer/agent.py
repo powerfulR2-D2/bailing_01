@@ -104,9 +104,12 @@ class InterviewerAgent:
                         "id": question.get("id", f"q{idx}"),
                         "question": question.get("question"), # Keep original behavior (might be None)
                         "type": question.get("type", "open_ended"),
+                        "image_path": question.get("image_path"),
+                        "need_confirm": question.get("need_confirm", False),
+                        "speech_text": question.get("speech_text", None),
                         # Use 'key_points' primarily, fallback to 'expected_topics' for compatibility
                         "key_points": question.get("key_points", question.get("expected_topics", [])),
-                        "time_limit": question.get("time_limit", 300)
+                        "time_limit": question.get("time_limit", 0)
                     }
                     # Original didn't explicitly check for missing 'question' here, maintaining that.
                     # If 'question' is None, it might cause issues later, but we stick to original logic.
@@ -291,6 +294,22 @@ class InterviewerAgent:
     # --- ORIGINAL: generate_next_action ---
     # (With LLM call replaced)
     async def generate_next_action(self, participant_response: str) -> Dict:
+        if self.scale_type=="MoCA":
+            self.current_question_index+=1
+            current_question = self.script[self.current_question_index]
+            
+            next_action={
+                "role": "assistant",
+                "response": current_question["question"],
+                "type": current_question["type"],
+                "image_path": current_question.get("image_path", None),
+                "time_limit": current_question.get("time_limit", None),
+                "need_confirm": current_question.get("need_confirm", False),
+                "speech_text": current_question.get("speech_text", None),
+                }
+
+            return next_action
+
         """Generate the next interviewer action based on the participant's response."""
         try:
             self.conversation_history.append({

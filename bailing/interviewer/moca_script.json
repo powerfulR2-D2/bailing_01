@@ -1,0 +1,214 @@
+{
+  "tasks": [
+    {
+      "id": "moca_introduction",
+      "instruction": "您好，我们现在开始进行蒙特利尔认知评估（MoCA）。我会给您一些指示，请您尽力按照要求完成。",
+      "type": "introduction",
+      "task_goal": "Begin the assessment",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_trails",
+      "instruction": "请看这里。请您按照从数字到汉字，并按数字和汉字顺序交替升高的顺序画一条连线。从数字'1'开始，画到汉字'甲'，然后到数字'2'，再到汉字'乙'，依此类推，一直到汉字'戊'结束。请开始。",
+      "type": "instruction_visual",
+      "task_goal": "Connect numbers (1-5) and Chinese characters (甲-戊) in alternating ascending order.",
+      "time_limit": 120
+    },
+    {
+      "id": "moca_cube",
+      "instruction": "请您照着这幅图（立方体），在旁边的空白处把它尽可能准确地画出来。",
+      "type": "instruction_visual",
+      "task_goal": "Copy the cube drawing.",
+      "time_limit": 120
+    },
+    {
+      "id": "moca_clock",
+      "instruction": "请您画一个钟表，标出所有数字，并将指针指向11点过10分。",
+      "type": "instruction_visual",
+      "task_goal": "Draw a clock face with numbers and hands indicating 11:10.",
+      "time_limit": 180
+    },
+    {
+      "id": "moca_naming_lion",
+      "instruction": "请您告诉我这个动物的名字。[指向狮子图片]",
+      "type": "verbal_naming",
+      "task_goal": "Name the first animal (Lion).",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_naming_rhino",
+      "instruction": "请您告诉我这个动物的名字。[指向犀牛图片]",
+      "type": "verbal_naming",
+      "task_goal": "Name the second animal (Rhino).",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_naming_camel",
+      "instruction": "请您告诉我这个动物的名字。[指向骆驼图片]",
+      "type": "verbal_naming",
+      "task_goal": "Name the third animal (Camel).",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_memory_instruction_1",
+      "instruction": "这是一个记忆力测验。我会给您读5个词，请您注意听并记住。等会儿我会让您回忆这些词。这五个词是：面孔, 天鹅绒, 教堂, 菊花, 红色。现在请告诉我您记住了哪些词？（不必按顺序）",
+      "type": "instruction_verbal_recall",
+      "task_goal": "Instruct memory task, recite words (Trial 1), and prompt immediate recall.",
+      "time_limit": 120
+    },
+    {
+      "id": "moca_memory_instruction_2",
+      "instruction": "我把这些词再读一遍，请您努力去记并告诉我您记住的所有词，包括您第一次已经说过的词。这五个词是：面孔, 天鹅绒, 教堂, 菊花, 红色。现在请再告诉我您记住了哪些词？",
+      "type": "instruction_verbal_recall",
+      "task_goal": "Instruct memory task, recite words (Trial 2), and prompt immediate recall.",
+      "time_limit": 120
+    },
+    {
+      "id": "moca_memory_instruction_delay_info",
+      "instruction": "好的。请记住这些词，稍后在评估结束前我还会再问您一次。",
+      "type": "information",
+      "task_goal": "Inform participant about the delayed recall test later.",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_attention_digits_forward",
+      "instruction": "下面我说一些数字，您仔细听，当我说完时请您跟着照样背出来。数字是：2, 1, 8, 5, 4。",
+      "type": "instruction_verbal_recall",
+      "task_goal": "Instruct forward digit span and present the sequence (2 1 8 5 4).",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_attention_digits_backward",
+      "instruction": "下面我再说一些数字，但这次当我说完时请您按照倒过来的顺序背出来。数字是：7, 4, 2。",
+      "type": "instruction_verbal_recall",
+      "task_goal": "Instruct backward digit span and present the sequence (7 4 2).",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_attention_vigilance",
+      "instruction": "下面我要读一串数字。每当我读到数字 '1' 的时候，请您拍一下桌子（或拍手）。当我读其他数字时不要拍。数字串是：[请在此处插入实际数字序列，例如 F A C E B A A J K L B A F A K D E A A A J A M O F A A B]",
+      "type": "instruction_vigilance",
+      "task_goal": "Instruct vigilance task (tap on '1') and read the number sequence (requires standard sequence, e.g., 5 2 9 4 5 1 3 8 6 1 7 4 1 9 2 8 3 1 5 7 1 6 4 8).",
+      "time_limit": 90
+    },
+    {
+      "id": "moca_attention_serial7s",
+      "instruction": "现在请您做一道计算题。请从100开始，连续减去7，一直往下减，直到我说停为止。请开始。",
+      "type": "instruction_calculation",
+      "task_goal": "Instruct serial 7s subtraction starting from 100.",
+      "time_limit": 120
+    },
+    {
+      "id": "moca_attention_serial7s_stop",
+      "instruction": "好的，可以了。",
+      "type": "instruction_stop_task",
+      "task_goal": "Stop the serial 7s task.",
+      "time_limit": 10
+    },
+    {
+      "id": "moca_language_repeat_1",
+      "instruction": "现在请您跟我重复一句话：我只知道今天张亮是帮过忙的人。",
+      "type": "instruction_verbal_repeat",
+      "task_goal": "Instruct and present the first sentence for repetition.",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_language_repeat_2",
+      "instruction": "请您再跟我重复一句话：当狗在房间里的时候，猫总是藏在沙发下。",
+      "type": "instruction_verbal_repeat",
+      "task_goal": "Instruct and present the second sentence for repetition.",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_language_fluency",
+      "instruction": "现在请您在1分钟内尽可能多地说出动物的名字。我会计时。请开始。",
+      "type": "instruction_verbal_fluency",
+      "task_goal": "Instruct verbal fluency task (animals, 1 minute).",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_language_fluency_stop",
+      "instruction": "好的，时间到。",
+      "type": "instruction_stop_task",
+      "task_goal": "Stop the verbal fluency task.",
+      "time_limit": 10
+    },
+    {
+      "id": "moca_abstraction_example",
+      "instruction": "请告诉我香蕉和桔子这两种事物有什么共同之处？（提示：比如说，它们都是水果）。",
+      "type": "instruction_abstraction",
+      "task_goal": "Explain abstraction task with example (Banana-Orange).",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_abstraction_train_bicycle",
+      "instruction": "好，现在请告诉我，火车和自行车有什么共同之处？",
+      "type": "instruction_abstraction",
+      "task_goal": "Ask for similarity between Train and Bicycle.",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_abstraction_watch_ruler",
+      "instruction": "请告诉我，手表和尺子有什么共同之处？",
+      "type": "instruction_abstraction",
+      "task_goal": "Ask for similarity between Watch and Ruler.",
+      "time_limit": 60
+    },
+    {
+      "id": "moca_delayed_recall_instruction",
+      "instruction": "刚才我给您读了几个词让您记住，现在请您告诉我还能记起哪些词？",
+      "type": "instruction_verbal_recall_delayed",
+      "task_goal": "Prompt for delayed recall of the 5 words.",
+      "time_limit": 200
+    },
+    {
+      "id": "moca_orientation_date",
+      "instruction": "请告诉我今天的日期（几号）？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current date (day number).",
+      "time_limit": 30
+    },
+     {
+      "id": "moca_orientation_month",
+      "instruction": "请告诉我现在的月份？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current month.",
+      "time_limit": 30
+    },
+     {
+      "id": "moca_orientation_year",
+      "instruction": "请告诉我现在的年份？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current year.",
+      "time_limit": 30
+    },
+     {
+      "id": "moca_orientation_day",
+      "instruction": "请告诉我今天是星期几？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current day of the week.",
+      "time_limit": 30
+    },
+     {
+      "id": "moca_orientation_place",
+      "instruction": "请告诉我您现在在什么地方（例如：医院、诊所、办公室的名称）？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current place/location name.",
+      "time_limit": 30
+    },
+     {
+      "id": "moca_orientation_city",
+      "instruction": "请告诉我这里是哪个城市？",
+      "type": "instruction_orientation",
+      "task_goal": "Ask for the current city.",
+      "time_limit": 30
+    },
+    {
+      "id": "moca_conclusion",
+      "instruction": "好的，评估的所有项目都完成了。非常感谢您的时间和配合！",
+      "type": "conclusion",
+      "task_goal": "End the assessment",
+      "time_limit": 30
+    }
+  ]
+}

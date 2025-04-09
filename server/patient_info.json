@@ -1,10 +1,10 @@
 {
-    "name": "梁非凡",
-    "idCard": "310103200001010056",
-    "phone": "17323891312",
+    "name": "卜德文",
+    "idCard": "123123123123123123",
+    "phone": "18245889543",
     "doctor": "doctor2",
-    "scale": "hamd",
+    "scale": "MoCA",
     "gender": "male",
-    "age": "22",
+    "age": "12",
     "medical_history": ""
 }

@@ -1,0 +1,298 @@
+{
+  "questions": [
+    {
+      "id": "moca_introduction",
+      "question": "您好，我们现在开始进行蒙特利尔认知评估（MoCA）。您完全不用担心结果，我们只是通过一些有趣的小任务来了解大脑的活跃状态。我会给您一些指示，尽力按照要求完成就好，中间有任何需要休息或者不明白的地方，随时告诉我哦！",
+      "type": "introduction",
+      "task_goal": "Begin the assessment",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_trails",
+      "question": "请您按照1-甲-2-乙-3-丙-4-丁-5-戊的顺序，依次将这些数字和汉字连接起来。",
+      "type": "draw",
+      "task_goal": "Connect numbers and letters in sequence.",
+      "time_limit": 120,
+      "requires_drawing": true,
+      "requires_voice": true,
+      "image_path": "MoCA_images/1.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_cube",
+      "question": "请您仔细观察右边的立方体图形，然后在左边的空白处画一个完全相同的立方体。",
+      "type": "draw",
+      "task_goal": "Draw the cube exactly as shown.",
+      "time_limit": 60,
+      "requires_drawing": true,
+      "requires_voice": true,
+      "image_path": "MoCA_images/2.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_clock",
+      "question": "请您在空白处画一个圆形的钟表，把所有数字都画上，然后把时针和分针画到11点10分的位置。",
+      "type": "draw",
+      "task_goal": "Draw a clock showing 11:10.",
+      "time_limit": 180,
+      "requires_drawing": true,
+      "requires_voice": true,
+      "image_path": "MoCA_images/3.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_naming_lion",
+      "question": "请您告诉我这个动物的名字。",
+      "type": "image",
+      "task_goal": "Name the first animal (Lion).",
+      "time_limit": 30,
+      "requires_voice": true,
+      "image_path": "MoCA_images/4.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_naming_rhino",
+      "question": "请您告诉我这个动物的名字。",
+      "type": "image",
+      "task_goal": "Name the second animal (Rhino).",
+      "time_limit": 30,
+      "requires_voice": true,
+      "image_path": "MoCA_images/5.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_naming_camel",
+      "question": "请您告诉我这个动物的名字。",
+      "type": "image",
+      "task_goal": "Name the third animal (Camel).",
+      "time_limit": 30,
+      "requires_voice": true,
+      "image_path": "MoCA_images/6.png",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_memory_question_1",
+      "question": "这是一个记忆力测验。我会给您读5个词，请您注意听并记住。等会儿我会让您回忆这些词。",
+      "type": "question_verbal_recall",
+      "task_goal": "Instruct memory task, recite words (Trial 1), and prompt immediate recall.",
+      "time_limit": 30,
+      "need_confirm": true,
+      "requires_voice": true,
+      "hide_text": true,
+      "speech_text": "这是一个记忆力测验。我会给您读5个词，请您注意听并记住。等会儿我会让您回忆这些词。这五个词是：面孔, 天鹅绒, 教堂, 菊花, 红色。现在请告诉我您记住了哪些词？",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_memory_question_2",
+      "question": "我把这些词再读一遍，请您努力去记并告诉我您记住的所有词，包括您第一次已经说过的词。",
+      "type": "question_verbal_recall",
+      "task_goal": "Instruct memory task, recite words (Trial 2), and prompt immediate recall.",
+      "time_limit": 30,
+      "need_confirm": true,
+      "requires_voice": true,
+      "hide_text": true,
+      "speech_text": "我把这些词再读一遍，请您努力去记并告诉我您记住的所有词，包括您第一次已经说过的词。这五个词是：面孔, 天鹅绒, 教堂, 菊花, 红色。现在请再告诉我您记住了哪些词？",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_memory_question_delay_info",
+      "question": "好的。请记住这些词，稍后在评估结束前我还会再问您一次。",
+      "type": "information",
+      "task_goal": "Inform participant about the delayed recall test later.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_attention_digits_forward",
+      "question": "请您仔细听我读的数字，然后按照相同的顺序重复一遍。",
+      "type": "question_verbal_recall",
+      "task_goal": "Instruct forward digit span and present the sequence.",
+      "time_limit": 60,
+      "requires_voice": true,
+      "hide_text": true,
+      "speech_text": "请您仔细听我读的数字，然后按照相同的顺序重复一遍：2, 1, 8, 5, 4",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_attention_digits_backward",
+      "question": "现在我要读另一串数字，请您按照相反的顺序重复。",
+      "type": "question_verbal_recall",
+      "task_goal": "Instruct backward digit span and present the sequence.",
+      "time_limit": 30,
+      "need_confirm": true,
+      "requires_voice": true,
+      "hide_text": true,
+      "speech_text": "现在我要读另一串数字，请您按照相反的顺序重复：7, 4, 2",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_attention_vigilance",
+      "question": "下面我要读一串数字。每当我读到数字 '1' 的时候，请您拍一下桌子（或拍手）。当我读其他数字时不要拍。",
+      "type": "question_vigilance",
+      "task_goal": "Instruct vigilance task.",
+      "time_limit": 30,
+      "need_confirm": true,
+      "requires_voice": true,
+      "hide_text": true,
+      "speech_text": "下面我要读一串数字。每当我读到数字 '1' 的时候，请您拍一下桌子（或拍手）。当我读其他数字时不要拍。数字是：5, 2, 9, 4, 5, 1, 3, 8, 6, 1, 7",
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_attention_serial7s",
+      "question": "现在请您做一道计算题。请从100开始，连续减去7，一直往下减，直到我说停为止。请开始。",
+      "type": "question_calculation",
+      "task_goal": "Instruct serial 7s subtraction starting from 100.",
+      "time_limit": 120,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_attention_serial7s_stop",
+      "question": "好的，可以了。",
+      "type": "question_stop_task",
+      "task_goal": "Stop the serial 7s task.",
+      "time_limit": 10,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_language_repeat_1",
+      "question": "现在请您跟我重复一句话：我只知道今天张亮是帮过忙的人。",
+      "type": "question_verbal_repeat",
+      "task_goal": "Instruct and present the first sentence for repetition.",
+      "time_limit": 60,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_language_repeat_2",
+      "question": "请您再跟我重复一句话：当狗在房间里的时候，猫总是藏在沙发下。",
+      "type": "question_verbal_repeat",
+      "task_goal": "Instruct and present the second sentence for repetition.",
+      "time_limit": 60,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_language_fluency",
+      "question": "现在请您在1分钟内尽可能多地说出动物的名字。我会计时。请开始。",
+      "type": "question_verbal_fluency",
+      "task_goal": "Instruct verbal fluency task (animals, 1 minute).",
+      "time_limit": 60,
+      "need_confirm": true,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_language_fluency_stop",
+      "question": "好的，时间到。",
+      "type": "question_stop_task",
+      "task_goal": "Stop the verbal fluency task.",
+      "time_limit": 10,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_abstraction_example",
+      "question": "请告诉我香蕉和桔子这两种事物有什么共同之处？",
+      "type": "question_abstraction",
+      "task_goal": "Explain abstraction task with example (Banana-Orange).",
+      "time_limit": 60,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_abstraction_train_bicycle",
+      "question": "好，现在请告诉我，火车和自行车有什么共同之处？",
+      "type": "question_abstraction",
+      "task_goal": "Ask for similarity between Train and Bicycle.",
+      "time_limit": 60,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_abstraction_watch_ruler",
+      "question": "请告诉我，手表和尺子有什么共同之处？",
+      "type": "question_abstraction",
+      "task_goal": "Ask for similarity between Watch and Ruler.",
+      "time_limit": 60,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_delayed_recall_question",
+      "question": "刚才我给您读了几个词让您记住，现在请您告诉我还能记起哪些词？",
+      "type": "question_verbal_recall_delayed",
+      "task_goal": "Prompt for delayed recall of the 5 words.",
+      "time_limit": 200,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_date",
+      "question": "请告诉我今天的日期（几号）？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current date (day number).",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_month",
+      "question": "请告诉我现在的月份？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current month.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_year",
+      "question": "请告诉我现在的年份？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current year.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_day",
+      "question": "请告诉我今天是星期几？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current day of the week.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_place",
+      "question": "请告诉我您现在在什么地方？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current place/location name.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_orientation_city",
+      "question": "请告诉我这里是哪个城市？",
+      "type": "question_orientation",
+      "task_goal": "Ask for the current city.",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    },
+    {
+      "id": "moca_conclusion",
+      "question": "好的，评估的所有项目都完成了。非常感谢您的时间和配合！",
+      "type": "conclusion",
+      "task_goal": "End the assessment",
+      "time_limit": 30,
+      "requires_voice": true,
+      "next_triggers": ["好的", "下一个", "完成了", "可以了"]
+    }
+  ]
+}

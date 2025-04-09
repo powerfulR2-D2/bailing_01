@@ -115,6 +115,14 @@ class InterviewSession:
     async def initialize_agent(self, patient_info):
         try:
             if patient_info:
+                agent_config = {"llm": self.llm_config}
+                if patient_info.get('scale') == "MoCA":
+                    logger.info("using MoCA script")
+                    self.default_script_path = os.path.join(os.path.dirname(__file__), "interviewer\\temp_MoCA_script.json")
+                    self.agent = InterviewerAgent(self.default_script_path, agent_config,patient_info.get('scale'))
+
+                    self.logger.start_new_session()
+                    return True
                 # Generate personalized questions based on patient info
                 logging.info("Generating personalized questions...")
                 logging.info(f"Patient info: {patient_info}")
@@ -130,14 +138,14 @@ class InterviewSession:
                 temp_script_path = os.path.join(os.path.dirname(__file__), "interviewer/temp_script.json")
 
                 # Reconstruct the config structure expected by InterviewerAgent
-                agent_config = {"llm": self.llm_config}
-                self.agent = InterviewerAgent(temp_script_path, agent_config) # Pass reconstructed config
+                
+                self.agent = InterviewerAgent(temp_script_path, agent_config,patient_info.get('scale')) # Pass reconstructed config
             else:
                 logging.info("Using default questions")
                 # Assume default script path needs similar reconstruction if used
                 self.default_script_path = os.path.join(os.path.dirname(__file__), "interviewer/default_script.json") # Ensure default path exists or is handled
                 agent_config = {"llm": self.llm_config}
-                self.agent = InterviewerAgent(self.default_script_path, agent_config) # Pass reconstructed config
+                self.agent = InterviewerAgent(self.default_script_path, agent_config,patient_info.get('scale')) # Pass reconstructed config
                 
             self.logger.start_new_session()
             return True
@@ -440,11 +448,16 @@ class Robot(ABC):
             # --- Original logic for VALID responses ---
             if self.callback:
                 # Send text content via callback
-                text_content = response_message.get('response', '')
+                logger.info(f"response_message.get('speech_text'):{response_message.get('speech_text')}")
+                if response_message.get('speech_text') != None:
+                    text_content = response_message.get('speech_text', '')
+                else:
+                    text_content = response_message.get('response', '')
                 self.callback({
                     "role": "assistant",
-                    "content": text_content,
-                    "need_confirm": response_message.get('need_confirm', False) # Pass confirm flag
+                    "content": response_message.get('response', ''),
+                    "need_confirm": response_message.get('need_confirm', False), # Pass confirm flag
+                    "time_limit": response_message.get('time_limit', 0)
                 })
 
                 # Submit for TTS only if there is text content
@@ -542,7 +555,7 @@ class Robot(ABC):
     def run(self):
         
         
-        script_path = os.path.join("bailing", "interviewer", "temp_script.json")
+        script_path=self.session.default_script_path
         with open(script_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             initial_question=data["questions"][0]["question"]
@@ -700,11 +713,20 @@ class Robot(ABC):
                 self.callback({
                     "role": "assistant", 
                     "content": response_message['response'],
-                    "need_confirm": response_message['need_confirm']
+                    "need_confirm": response_message['need_confirm'],
+                    "time_limit": response_message['time_limit']
                 })
                 # 提交新的语音合成任务
                 logger.debug("提交 TTS 任务")
-                future = self.executor.submit(self.speak_and_play, response_message['response'])
+                logger.info(f"speecj_text:{response_message['speech_text']}")
+                if(response_message["speech_text"]!=None): 
+                    logger.info(f"speecj_text:{response_message['speech_text']}")
+                    future = self.executor.submit(self.speak_and_play, response_message['speech_text'])
+                
+                else:
+                    future = self.executor.submit(self.speak_and_play, response_message['response'])
+                
+                
                 
                 # 清空并放入最新任务
                 try:

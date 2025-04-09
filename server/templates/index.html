@@ -306,6 +306,7 @@
                         <option value="hamd">hamd</option>
                         <option value="hama">hama</option>
                         <option value="mini">mini</option>
+                        <option value="MoCA">MoCA</option>
                     </select>
                 </div>
                 
@@ -406,7 +407,7 @@
                 audioController = null;
             }
         }
-    
+
         class ImageInteraction {
             constructor() {
                 this.modal = document.getElementById('imageDrawingModal');
@@ -421,6 +422,7 @@
                 this.isDrawing = false;
                 this.lastX = 0;
                 this.lastY = 0;
+                this.savedCanvasState = null; // 保存初始画布状态
 
                 this.setupEventListeners();
             }
@@ -443,9 +445,8 @@
                 this.closeBtn.addEventListener('click', this.closeModal.bind(this));
             }
 
-            // 处理触摸开始事件
             handleTouchStart(e) {
-                e.preventDefault(); // 阻止默认触摸行为
+                e.preventDefault();
                 const touch = e.touches[0];
                 const rect = this.canvas.getBoundingClientRect();
                 this.isDrawing = true;
@@ -453,9 +454,8 @@
                 this.lastY = touch.clientY - rect.top;
             }
 
-            // 处理触摸移动事件
             handleTouchMove(e) {
-                e.preventDefault(); // 阻止默认触摸行为
+                e.preventDefault();
                 if (!this.isDrawing) return;
 
                 const touch = e.touches[0];
@@ -504,15 +504,20 @@
             stopDrawing() {
                 this.isDrawing = false;
             }
-
+            
             clearCanvas() {
-                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                if (this.savedCanvasState) {
+                    // 恢复初始状态
+                    this.ctx.putImageData(this.savedCanvasState, 0, 0);
+                } else {
+                    // 如果没有保存状态，则完全清空
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                }
             }
 
             saveDrawing() {
                 const dataURL = this.canvas.toDataURL('image/png');
                 
-                // 使用 fetch 上传图片
                 fetch('/upload_drawing', {
                     method: 'POST',
                     headers: {
@@ -524,10 +529,8 @@
                 .then(data => {
                     console.log('图片上传成功:', data);
                     
-                    // 隐藏原始图片和绘制后的图片
                     const allImages = document.querySelectorAll('.message img');
                     if (allImages.length > 0) {
-                        // 获取最后两张图片（原始图片和绘制后的图片）
                         const lastImages = Array.from(allImages).slice(-2);
                         lastImages.forEach(img => {
                             const messageDiv = img.closest('.message');
@@ -537,10 +540,8 @@
                         });
                     }
                     
-                    // 关闭绘图模态框
                     this.closeModal();
                     
-                    // 发送消息通知
                     socket.emit('add_message', {
                         role: 'user',
                         type: 'image',
@@ -551,15 +552,18 @@
                     console.error('上传失败:', error);
                 });
             }
+
             showImage(imageUrl) {
                 const img = new Image();
                 img.onload = () => {
-                    // 设置画布大小为图片大小，但不超过窗口大小
                     this.canvas.width = Math.min(img.width, window.innerWidth * 0.9);
                     this.canvas.height = Math.min(img.height, window.innerHeight * 0.9);
                     
-                    // 绘制原始图片
                     this.ctx.drawImage(img, 0, 0, this.canvas.width, this.canvas.height);
+                    
+                    // 保存初始状态
+                    this.savedCanvasState = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
+                    
                     this.modal.style.display = 'flex';
                 };
                 img.src = imageUrl;
@@ -569,7 +573,6 @@
                 this.modal.style.display = 'none';
             }
         }
-
         const imageInteraction = new ImageInteraction();
 
         function updateDialogue(dialogue) {
@@ -724,8 +727,19 @@
                     // 如果有录音按钮，添加事件监听
                     if (message.need_confirm === true || message.need_confirm === 'true') {
                         voiceRecorder.disable();
+                        timeLeft=message.time_limit;
+                        console.log("message.time_limit");
+                        console.log(message.time_limit);
                         setTimeout(() => {
                             const button = messageDiv.querySelector('#temporary-button');
+                            let timeoutId; // 存储计时器ID，用于清除
+                            const countdown = setInterval(() => {
+                                timeLeft--;
+                                button.querySelector('span').textContent = `停止录音 (${timeLeft}s)`;
+                                if (timeLeft <= 0) {
+                                    clearInterval(countdown);
+                                }
+                            }, message.time_limit*1000);
                             if (button) {
                                 button.addEventListener('click', async function() {
                                     const isRecording = button.getAttribute('data-recording') === 'true';
@@ -737,13 +751,26 @@
                                         button.setAttribute('data-recording', 'true');
                                         button.classList.add('recording');
                                         button.innerHTML = '<i class="fas fa-stop"></i><span>停止录音</span>';
+                                        // 设置超时自动停止（例如30秒）
+                                        timeoutId = setTimeout(() => {
+                                            if (button.getAttribute('data-recording') === 'true') {
+                                                voiceRecorder.stopSimpleRecording();
+                                                button.setAttribute('data-recording', 'false');
+                                                voiceRecorder.enable();
+                                                button.classList.remove('recording');
+                                                button.innerHTML = '<i class="fas fa-microphone"></i><span>开始录音</span>';
+                                                
+                                                button.remove(); // 彻底移除按钮（包括事件监听器）
+                                        }
+                                        }, message.time_limit * 1000);
                                     } else {
                                         voiceRecorder.stopSimpleRecording();
                                         button.setAttribute('data-recording', 'false');
-                                        voiceRecorder.able();
+                                        voiceRecorder.enable();
                                         button.classList.remove('recording');
                                         button.innerHTML = '<i class="fas fa-microphone"></i><span>开始录音</span>';
-                                        button.style.display = 'none';
+                                        
+                                        button.remove(); // 彻底移除按钮（包括事件监听器）
                                     }
                                 });
                             }
@@ -863,7 +890,7 @@
                 
                 // 配置参数
                 this.config = {
-                    threshold: 0.05,  // 声音检测阈值（音量）
+                    threshold: 0.08,  // 声音检测阈值（音量）
                     silenceTime: 1000  // 静音多久后停止录音(毫秒)
                 };
 
